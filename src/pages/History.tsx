@@ -1,20 +1,30 @@
 import React from "react";
 import { HistoryRow, PaperWidth } from "../types";
 import { formatRupiah, printImageDataUrl } from "../utils";
+import { buildReceiptImageDataUrl } from "../receiptPrint";
 
 interface HistoryProps {
   rows: HistoryRow[];
   paperWidth: PaperWidth;
   onDelete: (id: string) => void;
+  onMarkPrinted: (id: string) => void;
 }
 
-export default function History({ rows, paperWidth, onDelete }: HistoryProps) {
+export default function History({
+  rows,
+  paperWidth,
+  onDelete,
+  onMarkPrinted,
+}: HistoryProps) {
   const [query, setQuery] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState("all");
   const [jenisFilter, setJenisFilter] = React.useState("all");
   const [dateFilter, setDateFilter] = React.useState("");
   const [page, setPage] = React.useState(1);
   const [selectedRow, setSelectedRow] = React.useState<HistoryRow | null>(null);
+  const [previewDataUrl, setPreviewDataUrl] = React.useState<string>("");
+  const [isPreviewLoading, setIsPreviewLoading] = React.useState(false);
+  const [previewError, setPreviewError] = React.useState("");
   const pageSize = 8;
 
   const jenisOptions = React.useMemo(
@@ -50,6 +60,44 @@ export default function History({ rows, paperWidth, onDelete }: HistoryProps) {
     setPage(1);
   }, [query, statusFilter, jenisFilter, dateFilter]);
 
+  React.useEffect(() => {
+    let isMounted = true;
+    if (!selectedRow) {
+      setPreviewDataUrl("");
+      setPreviewError("");
+      setIsPreviewLoading(false);
+      return;
+    }
+    if (!selectedRow.printSnapshot) {
+      setPreviewDataUrl("");
+      setPreviewError("Data lama belum memiliki snapshot nota.");
+      setIsPreviewLoading(false);
+      return;
+    }
+    setIsPreviewLoading(true);
+    setPreviewError("");
+    buildReceiptImageDataUrl(selectedRow.printSnapshot, paperWidth)
+      .then((url) => {
+        if (isMounted) {
+          setPreviewDataUrl(url);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setPreviewError("Gagal memuat preview nota.");
+          setPreviewDataUrl("");
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsPreviewLoading(false);
+        }
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedRow, paperWidth]);
+
   const handleExportCsv = () => {
     const headers = ["No Nota", "Jenis", "Toko", "Tanggal", "Total", "Status"];
     const escapeCsv = (value: string | number) =>
@@ -79,85 +127,16 @@ export default function History({ rows, paperWidth, onDelete }: HistoryProps) {
     URL.revokeObjectURL(url);
   };
 
-  const handlePrintRow = (row: HistoryRow) => {
-    const paperPx = paperWidth === 80 ? 576 : 420;
-    const padding = 20;
-    const canvas = document.createElement("canvas");
-    canvas.width = paperPx;
-    canvas.height = 420;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "#000000";
-    ctx.textBaseline = "top";
-
-    let y = 18;
-    const divider = () => {
-      ctx.strokeStyle = "#000000";
-      ctx.setLineDash([4, 3]);
-      ctx.beginPath();
-      ctx.moveTo(padding, y);
-      ctx.lineTo(paperPx - padding, y);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      y += 10;
-    };
-    const rowLine = (left: string, right: string, bold = false) => {
-      ctx.font = `${bold ? "700" : "400"} 15px 'Courier New', monospace`;
-      ctx.fillText(left, padding, y);
-      const rw = ctx.measureText(right).width;
-      ctx.fillText(right, paperPx - padding - rw, y);
-      y += 22;
-    };
-
-    const drawLogo = (done: () => void) => {
-      if (!row.logoDataUrl) {
-        done();
-        return;
-      }
-      const img = new Image();
-      img.onload = () => {
-        const maxW = 170;
-        const maxH = 80;
-        const ratio = Math.min(maxW / img.width, maxH / img.height, 1);
-        const w = img.width * ratio;
-        const h = img.height * ratio;
-        ctx.drawImage(img, (paperPx - w) / 2, y, w, h);
-        y += h + 8;
-        done();
-      };
-      img.onerror = () => done();
-      img.src = row.logoDataUrl;
-    };
-
-    drawLogo(() => {
-      ctx.font = "700 16px 'Courier New', monospace";
-      const title = row.jenis;
-      const tw = ctx.measureText(title).width;
-      ctx.fillText(title, (paperPx - tw) / 2, y);
-      y += 24;
-      divider();
-      rowLine("No Nota", row.no);
-      rowLine("Toko", row.toko);
-      rowLine("Tanggal", row.tanggal || "-");
-      rowLine("Status", row.status);
-      divider();
-      rowLine("TOTAL", formatRupiah(row.total), true);
-      y += 6;
-
-      const cropped = document.createElement("canvas");
-      cropped.width = canvas.width;
-      cropped.height = Math.max(200, y + 10);
-      const cctx = cropped.getContext("2d");
-      if (!cctx) return;
-      cctx.fillStyle = "#ffffff";
-      cctx.fillRect(0, 0, cropped.width, cropped.height);
-      cctx.drawImage(canvas, 0, 0);
-
-      printImageDataUrl(cropped.toDataURL("image/png"), paperWidth);
-    });
+  const handlePrintRow = async (row: HistoryRow) => {
+    if (!row.printSnapshot) {
+      window.alert(
+        "Data ini belum punya snapshot nota. Simpan nota baru lalu cetak dari riwayat.",
+      );
+      return;
+    }
+    const dataUrl = await buildReceiptImageDataUrl(row.printSnapshot, paperWidth);
+    printImageDataUrl(dataUrl, paperWidth);
+    onMarkPrinted(row.id);
   };
 
   return (
@@ -241,7 +220,17 @@ export default function History({ rows, paperWidth, onDelete }: HistoryProps) {
                   <td className="px-4 py-3">{row.toko}</td>
                   <td className="px-4 py-3">{row.tanggal || "-"}</td>
                   <td className="px-4 py-3">{formatRupiah(row.total)}</td>
-                  <td className="px-4 py-3">{row.status}</td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`rounded-full px-2 py-1 text-xs ${
+                        row.status.toLowerCase().includes("dicetak")
+                          ? "bg-emerald-50 text-emerald-700"
+                          : "bg-slate-100 text-slate-700"
+                      }`}
+                    >
+                      {row.status}
+                    </span>
+                  </td>
                   <td className="px-4 py-3">
                     <div className="flex gap-2">
                       <button
@@ -249,12 +238,6 @@ export default function History({ rows, paperWidth, onDelete }: HistoryProps) {
                         className="rounded-xl border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-700"
                       >
                         Lihat
-                      </button>
-                      <button
-                        onClick={() => handlePrintRow(row)}
-                        className="rounded-xl border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-700"
-                      >
-                        Cetak
                       </button>
                       <button
                         onClick={() => onDelete(row.id)}
@@ -334,25 +317,39 @@ export default function History({ rows, paperWidth, onDelete }: HistoryProps) {
               </button>
             </div>
 
-            <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              {[
-                ["No Nota", selectedRow.no],
-                ["Jenis", selectedRow.jenis],
-                ["Toko", selectedRow.toko],
-                ["Tanggal", selectedRow.tanggal || "-"],
-                ["Total", formatRupiah(selectedRow.total)],
-                ["Status", selectedRow.status],
-              ].map(([label, value]) => (
-                <div
-                  key={String(label)}
-                  className="rounded-2xl border border-slate-200 bg-slate-50 p-3"
-                >
-                  <div className="text-xs text-slate-500">{label}</div>
-                  <div className="mt-1 text-sm font-medium text-slate-900">
-                    {value}
-                  </div>
+            <div className="mt-5">
+              {isPreviewLoading && (
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-600">
+                  Memuat preview nota...
                 </div>
-              ))}
+              )}
+              {!isPreviewLoading && previewError && (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-800">
+                  {previewError}
+                </div>
+              )}
+              {!isPreviewLoading && !previewError && previewDataUrl && (
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <img
+                    src={previewDataUrl}
+                    alt="Preview nota"
+                    className="mx-auto w-full max-w-[320px] rounded-xl border border-slate-200 bg-white"
+                  />
+                </div>
+              )}
+            </div>
+            <div className="mt-4 flex justify-end">
+              <button
+                onClick={() => handlePrintRow(selectedRow)}
+                disabled={!selectedRow.printSnapshot || isPreviewLoading}
+                className={`rounded-xl px-4 py-2 text-sm font-medium ${
+                  selectedRow.printSnapshot && !isPreviewLoading
+                    ? "bg-slate-900 text-white"
+                    : "bg-slate-100 text-slate-400"
+                }`}
+              >
+                Cetak Nota
+              </button>
             </div>
           </div>
         </div>

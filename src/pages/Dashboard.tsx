@@ -25,11 +25,12 @@ export default function Dashboard({
     (acc, group) => acc + group.templates.length,
     0,
   );
-  const totalNotaHariIni = historyRows.filter(
-    (row) => row.tanggal === todayKey,
+  const totalNota = historyRows.length;
+  const unprintedCount = historyRows.filter(
+    (row) => !row.status.toLowerCase().includes("dicetak"),
   ).length;
-  const draftCount = historyRows.filter((row) =>
-    row.status.toLowerCase().includes("draft"),
+  const printedCount = historyRows.filter((row) =>
+    row.status.toLowerCase().includes("dicetak"),
   ).length;
   const recentRows = historyRows.slice(0, 6);
 
@@ -54,16 +55,21 @@ export default function Dashboard({
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <StatCard
-          label="Total Nota Hari Ini"
-          value={`${totalNotaHariIni}`}
-          hint={`tanggal ${todayKey}`}
+          label="Total Nota"
+          value={`${totalNota}`}
+          hint={`total data per ${todayKey}`}
         />
         <StatCard
-          label="Draft Belum Dicetak"
-          value={`${draftCount}`}
-          hint="masih menunggu finalisasi"
+          label="Belum Dicetak"
+          value={`${unprintedCount}`}
+          hint="akan berkurang saat nota dicetak"
+        />
+        <StatCard
+          label="Sudah Dicetak"
+          value={`${printedCount}`}
+          hint="naik saat cetak dari riwayat nota"
         />
         <StatCard
           label="Template Aktif"
@@ -143,7 +149,13 @@ export default function Dashboard({
                     <td className="px-4 py-3">{row.toko}</td>
                     <td className="px-4 py-3">{formatRupiah(row.total)}</td>
                     <td className="px-4 py-3">
-                      <span className="rounded-full bg-slate-100 px-2 py-1 text-xs">
+                      <span
+                        className={`rounded-full px-2 py-1 text-xs ${
+                          row.status.toLowerCase().includes("dicetak")
+                            ? "bg-emerald-50 text-emerald-700"
+                            : "bg-slate-100 text-slate-700"
+                        }`}
+                      >
                         {row.status}
                       </span>
                     </td>

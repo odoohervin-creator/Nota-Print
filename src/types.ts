@@ -26,6 +26,7 @@ export type MakanForm = {
   tanggal: string;
   jam: string;
   customer: string;
+  layanan: string;
   metodeBayar: string;
   logoDataUrl: string;
   catatan: string;
@@ -38,6 +39,7 @@ export type ParkirForm = {
   alamat: string;
   nomor: string;
   tanggal: string;
+  logoDataUrl: string;
   jamMasuk: string;
   jamKeluar: string;
   platNomor: string;
@@ -52,6 +54,7 @@ export type LainForm = {
   alamat: string;
   nomor: string;
   tanggal: string;
+  logoDataUrl: string;
   pihak: string;
   keterangan: string;
   catatan: string;
@@ -68,6 +71,13 @@ export type FormsState = {
 export type ItemsState = Record<CategoryKey, ItemRow[]>;
 
 export type SelectedTemplates = Record<CategoryKey, string>;
+
+export type PrintSnapshot = {
+  category: CategoryKey;
+  templateId: string;
+  form: MakanForm | ParkirForm | LainForm;
+  items: ItemRow[];
+};
 
 export type PageKey =
   | "dashboard"
@@ -86,6 +96,7 @@ export type HistoryRow = {
   status: string;
   tanggal: string;
   logoDataUrl?: string;
+  printSnapshot?: PrintSnapshot;
 };
 
 export type PaperWidth = 58 | 80;
@@ -95,4 +106,14 @@ export type AppSettings = {
   printerName: string;
   storeName: string;
   storeAddress: string;
+};
+
+export type SavedNotaTemplate = {
+  id: string;
+  name: string;
+  category: CategoryKey;
+  templateId: string;
+  form: MakanForm | ParkirForm | LainForm;
+  items: ItemRow[];
+  updatedAt: string;
 };

@@ -4,6 +4,8 @@ import {
   FormsState,
   ItemsState,
   ItemRow,
+  PrintSnapshot,
+  SavedNotaTemplate,
   SelectedTemplates,
   MakanForm,
   ParkirForm,
@@ -14,6 +16,7 @@ import {
 import { STEP_LABELS } from "../constants";
 import SmallField from "../components/SmallField";
 import { classNames, formatRupiah, printImageDataUrl } from "../utils";
+import { buildReceiptImageDataUrl } from "../receiptPrint";
 
 interface CreateNotaProps {
   category: CategoryKey;
@@ -29,7 +32,11 @@ interface CreateNotaProps {
   updateItem: (id: number, field: keyof ItemRow, value: string) => void;
   removeItem: (id: number) => void;
   resetCurrentCategory: () => void;
-  saveCurrentNota: () => void;
+  saveCurrentNota: (snapshot: PrintSnapshot) => void;
+  savedNotaTemplates: SavedNotaTemplate[];
+  saveCurrentAsTemplate: (name: string) => void;
+  applySavedTemplate: (id: string) => void;
+  deleteSavedTemplate: (id: string) => void;
   paperWidth: PaperWidth;
   templateGroups: Record<CategoryKey, TemplateGroup>;
 }
@@ -49,10 +56,17 @@ export default function CreateNota({
   removeItem,
   resetCurrentCategory,
   saveCurrentNota,
+  savedNotaTemplates,
+  saveCurrentAsTemplate,
+  applySavedTemplate,
+  deleteSavedTemplate,
   paperWidth,
   templateGroups,
 }: CreateNotaProps) {
   const [isConfirmed, setIsConfirmed] = React.useState(false);
+  const [livePreviewUrl, setLivePreviewUrl] = React.useState("");
+  const [isLivePreviewLoading, setIsLivePreviewLoading] = React.useState(false);
+  const [livePreviewError, setLivePreviewError] = React.useState("");
   const activeTemplates = templateGroups[category].templates;
   const activeTemplate = selectedTemplates[category];
   const activeTemplateName =
@@ -65,8 +79,13 @@ export default function CreateNota({
   const isLainTemplateB = category === "lain" && activeTemplate === "lain-b";
   const isLainTemplateC = category === "lain" && activeTemplate === "lain-c";
   const showExtraRow = category === "makan" || isParkirTemplateA || isLainTemplateA;
+  const [savedTemplateName, setSavedTemplateName] = React.useState("");
   const form = forms[category];
   const items = itemsByCategory[category];
+  const savedTemplatesByCategory = React.useMemo(
+    () => savedNotaTemplates.filter((template) => template.category === category),
+    [savedNotaTemplates, category],
+  );
   const getTemplateDesc = (templateId: string, currentDesc: string) => {
     if (currentDesc?.trim()) return currentDesc;
     if (category === "lain" && templateId === "lain-b") {
@@ -114,271 +133,51 @@ export default function CreateNota({
     }
   }, [step, category, activeTemplate]);
 
+  React.useEffect(() => {
+    let isMounted = true;
+    setIsLivePreviewLoading(true);
+    setLivePreviewError("");
+    buildReceiptImageDataUrl(
+      {
+        category,
+        templateId: activeTemplate,
+        form: JSON.parse(JSON.stringify(form)),
+        items: JSON.parse(JSON.stringify(items)),
+      },
+      paperWidth,
+    )
+      .then((url) => {
+        if (isMounted) {
+          setLivePreviewUrl(url);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setLivePreviewError("Preview gagal dimuat.");
+          setLivePreviewUrl("");
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLivePreviewLoading(false);
+        }
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [category, activeTemplate, form, items, paperWidth]);
+
   const handlePrint = async () => {
-    const f = form as MakanForm | ParkirForm | LainForm;
-
-    const infoRows = [
-      { label: "No Nota", value: f.nomor || "-" },
-      { label: "Tanggal", value: f.tanggal || "-" },
-    ];
-    if (isMakanTemplateA) {
-      infoRows.push(
-        { label: "Jam", value: (f as MakanForm).jam || "-" },
-        { label: "Atas Nama", value: (f as MakanForm).customer || "-" },
-        { label: "Bayar", value: (f as MakanForm).metodeBayar || "-" },
-      );
-    } else if (isMakanTemplateB) {
-      infoRows.push({ label: "Jam", value: (f as MakanForm).jam || "-" });
-    }
-    if (isParkirTemplateA) {
-      infoRows.push(
-        { label: "Plat No", value: (f as ParkirForm).platNomor || "-" },
-        { label: "Kendaraan", value: (f as ParkirForm).kendaraan || "-" },
-        { label: "Masuk", value: (f as ParkirForm).jamMasuk || "-" },
-        { label: "Keluar", value: (f as ParkirForm).jamKeluar || "-" },
-      );
-    } else if (isParkirTemplateB) {
-      infoRows.push(
-        { label: "Plat No", value: (f as ParkirForm).platNomor || "-" },
-        { label: "Kendaraan", value: (f as ParkirForm).kendaraan || "-" },
-      );
-    }
-    if (isLainTemplateA) {
-      infoRows.push(
-        { label: "Customer", value: (f as LainForm).pihak || "-" },
-        { label: "Ket.", value: (f as LainForm).keterangan || "-" },
-      );
-    } else if (isLainTemplateB) {
-      infoRows.push({ label: "Layanan", value: (f as LainForm).keterangan || "-" });
-    } else if (isLainTemplateC) {
-      infoRows.push(
-        { label: "Pembeli", value: (f as LainForm).pihak || "-" },
-        { label: "Keperluan", value: (f as LainForm).keterangan || "-" },
-      );
-    }
-
-    const wrapText = (
-      ctx: CanvasRenderingContext2D,
-      text: string,
-      maxWidth: number,
-    ) => {
-      const words = String(text || "-").split(" ");
-      const lines: string[] = [];
-      let line = "";
-      words.forEach((word) => {
-        const test = line ? `${line} ${word}` : word;
-        if (ctx.measureText(test).width > maxWidth && line) {
-          lines.push(line);
-          line = word;
-        } else {
-          line = test;
-        }
-      });
-      if (line) lines.push(line);
-      return lines;
-    };
-
-    const loadImage = (src: string) =>
-      new Promise<HTMLImageElement>((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => resolve(img);
-        img.onerror = reject;
-        img.src = src;
-      });
-
-    const paperPx = paperWidth === 80 ? 576 : 420;
-    const padding = 20;
-    const innerWidth = paperPx - padding * 2;
-    const canvas = document.createElement("canvas");
-    canvas.width = paperPx;
-    canvas.height =
-      360 +
-      infoRows.length * 24 +
-      items.length * 40 +
-      (f.catatan ? Math.ceil(f.catatan.length / 32) * 20 : 20);
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "#000000";
-    ctx.textBaseline = "top";
-    ctx.font = "16px 'Courier New', monospace";
-    let y = 16;
-
-    const logoSrc = isMakanTemplateA ? (f as MakanForm).logoDataUrl || "" : "";
-    if (logoSrc) {
-      try {
-        const logo = await loadImage(logoSrc);
-        const maxW = 180;
-        const maxH = 80;
-        const ratio = Math.min(maxW / logo.width, maxH / logo.height, 1);
-        const w = logo.width * ratio;
-        const h = logo.height * ratio;
-
-        const logoCanvas = document.createElement("canvas");
-        logoCanvas.width = Math.max(1, Math.round(w));
-        logoCanvas.height = Math.max(1, Math.round(h));
-        const lctx = logoCanvas.getContext("2d");
-        if (lctx) {
-          lctx.drawImage(logo, 0, 0, logoCanvas.width, logoCanvas.height);
-
-          // Thermal-friendly conversion: grayscale + threshold to pure black/white.
-          const imageData = lctx.getImageData(
-            0,
-            0,
-            logoCanvas.width,
-            logoCanvas.height,
-          );
-          const data = imageData.data;
-          for (let i = 0; i < data.length; i += 4) {
-            const r = data[i];
-            const g = data[i + 1];
-            const b = data[i + 2];
-            const a = data[i + 3];
-            if (a < 40) {
-              data[i] = 255;
-              data[i + 1] = 255;
-              data[i + 2] = 255;
-              data[i + 3] = 255;
-              continue;
-            }
-            const gray = 0.299 * r + 0.587 * g + 0.114 * b;
-            const bw = gray < 165 ? 0 : 255;
-            data[i] = bw;
-            data[i + 1] = bw;
-            data[i + 2] = bw;
-            data[i + 3] = 255;
-          }
-          lctx.putImageData(imageData, 0, 0);
-          ctx.drawImage(logoCanvas, (paperPx - w) / 2, y, w, h);
-        } else {
-          ctx.drawImage(logo, (paperPx - w) / 2, y, w, h);
-        }
-        y += h + 8;
-      } catch {
-        // ignore logo load errors
-      }
-    }
-
-    const centerLine = (text: string, bold = false) => {
-      ctx.font = `${bold ? "700" : "400"} 16px 'Courier New', monospace`;
-      const t = String(text || "-");
-      const w = ctx.measureText(t).width;
-      ctx.fillText(t, (paperPx - w) / 2, y);
-      y += 22;
-    };
-    const divider = () => {
-      ctx.strokeStyle = "#000000";
-      ctx.setLineDash([4, 3]);
-      ctx.beginPath();
-      ctx.moveTo(padding, y);
-      ctx.lineTo(paperPx - padding, y);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      y += 10;
-    };
-    const row = (left: string, right: string, bold = false) => {
-      ctx.font = `${bold ? "700" : "400"} 15px 'Courier New', monospace`;
-      const l = String(left || "-");
-      const r = String(right || "-");
-      ctx.fillText(l, padding, y);
-      const rw = ctx.measureText(r).width;
-      ctx.fillText(r, paperPx - padding - rw, y);
-      y += 22;
-    };
-
-    if (isMakanTemplateB) {
-      centerLine(f.toko || "-", true);
-    } else {
-      centerLine(f.toko || "-", true);
-      wrapText(ctx, f.alamat || "-", innerWidth).forEach((line) => centerLine(line));
-    }
-    divider();
-    infoRows.forEach((info) => row(info.label, info.value));
-    divider();
-
-    items.forEach((item) => {
-      ctx.font = "700 15px 'Courier New', monospace";
-      ctx.fillText(item.name || "-", padding, y);
-      y += 20;
-      row(
-        `${item.qty} x ${formatRupiah(item.price)}`,
-        formatRupiah(item.qty * item.price),
-      );
-    });
-
-    divider();
-    row("Subtotal", formatRupiah(subtotal));
-    row(f.biayaTambahanLabel || "Biaya Tambahan", formatRupiah(extra));
-    row("TOTAL", formatRupiah(total), true);
-    divider();
-
-    if (!(isMakanTemplateB || isLainTemplateB || isParkirTemplateB)) {
-      wrapText(ctx, f.catatan || "-", innerWidth).forEach((line) => centerLine(line));
-    }
-    y += 8;
-
-    if (isParkirTemplateA || isParkirTemplateB) {
-      y = 16;
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = "#000000";
-      centerLine(f.toko || "-", true);
-      if (isParkirTemplateA && (f as ParkirForm).alamat) {
-        wrapText(ctx, (f as ParkirForm).alamat, innerWidth).forEach((line) =>
-          centerLine(line),
-        );
-      }
-      divider();
-
-      if (isParkirTemplateA) {
-        row("No Nota", f.nomor || "-");
-        row("Tanggal", f.tanggal || "-");
-        y += 4;
-        row("Plat", (f as ParkirForm).platNomor || "-");
-        row("Jenis", (f as ParkirForm).kendaraan || "-");
-        y += 4;
-        row("Masuk", (f as ParkirForm).jamMasuk || "-");
-        row("Keluar", (f as ParkirForm).jamKeluar || "-");
-        row("Durasi", parkirDurationText);
-        divider();
-        row((items[0]?.name || "Biaya Parkir").replace(/\s+/g, " "), formatRupiah(subtotal));
-        divider();
-        row("TOTAL", formatRupiah(total), true);
-      }
-
-      if (isParkirTemplateB) {
-        row("No", f.nomor || "-");
-        centerLine(f.tanggal || "-");
-        divider();
-        row("Plat", (f as ParkirForm).platNomor || "-");
-        centerLine((f as ParkirForm).kendaraan || "-");
-        divider();
-        row("Parkir", formatRupiah(subtotal));
-        divider();
-        row("TOTAL", formatRupiah(total), true);
-      }
-
-      divider();
-      const closing =
-        isParkirTemplateA
-          ? f.catatan || "Terima kasih"
-          : f.catatan || "Simpan nota ini";
-      wrapText(ctx, closing, innerWidth).forEach((line) => centerLine(line));
-      y += 8;
-    }
-
-    const cropped = document.createElement("canvas");
-    cropped.width = canvas.width;
-    cropped.height = Math.max(200, Math.min(canvas.height, y + 10));
-    const cctx = cropped.getContext("2d");
-    if (!cctx) return;
-    cctx.fillStyle = "#ffffff";
-    cctx.fillRect(0, 0, cropped.width, cropped.height);
-    cctx.drawImage(canvas, 0, 0);
-
-    printImageDataUrl(cropped.toDataURL("image/png"), paperWidth);
+    const dataUrl = await buildReceiptImageDataUrl(
+      {
+        category,
+        templateId: activeTemplate,
+        form: JSON.parse(JSON.stringify(form)),
+        items: JSON.parse(JSON.stringify(items)),
+      },
+      paperWidth,
+    );
+    printImageDataUrl(dataUrl, paperWidth);
   };
 
   function renderInfoFields() {
@@ -386,8 +185,50 @@ export default function CreateNota({
       const f = form as MakanForm;
       return (
         <div className="grid gap-4 md:grid-cols-2">
+          <div className={isMakanTemplateA ? "" : "md:col-span-2"}>
+            <div className="mb-2 text-sm font-medium text-slate-700">
+              Nama Toko
+            </div>
+            <input
+              type="text"
+              value={f.toko}
+              onChange={(e) => updateForm("toko", e.target.value)}
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none"
+            />
+          </div>
+          <div>
+            <div className="mb-2 text-sm font-medium text-slate-700">
+              Logo Toko / Merchant
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="cursor-pointer rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800">
+                Upload Logo
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                      updateForm("logoDataUrl", String(reader.result || ""));
+                    };
+                    reader.readAsDataURL(file);
+                  }}
+                />
+              </label>
+              {f.logoDataUrl && (
+                <button
+                  onClick={() => updateForm("logoDataUrl", "")}
+                  className="rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800"
+                >
+                  Hapus
+                </button>
+              )}
+            </div>
+          </div>
           {[
-            ["Nama Toko", "toko", "text"],
             ["Alamat", "alamat", "text", true],
             ["Nomor Nota", "nomor", "text"],
             ["Tanggal", "tanggal", "date"],
@@ -410,6 +251,21 @@ export default function CreateNota({
               />
             </div>
           ))}
+          {isMakanTemplateA && (
+            <div>
+              <div className="mb-2 text-sm font-medium text-slate-700">
+                Layanan
+              </div>
+              <select
+                value={f.layanan || "Dine In"}
+                onChange={(e) => updateForm("layanan", e.target.value)}
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none"
+              >
+                <option value="Dine In">Dine In</option>
+                <option value="Take Away">Take Away</option>
+              </select>
+            </div>
+          )}
           <div>
             <div className="mb-2 text-sm font-medium text-slate-700">
               Nominal Biaya Tambahan
@@ -433,47 +289,13 @@ export default function CreateNota({
               className="min-h-[90px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none"
             />
           </div>
-          {isMakanTemplateA && (
-            <div className="md:col-span-2">
-              <div className="mb-2 text-sm font-medium text-slate-700">
-                Logo Toko / Merchant
-              </div>
-              <div className="flex flex-wrap items-center gap-3">
-                <label className="cursor-pointer rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800">
-                  Upload Logo
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      const reader = new FileReader();
-                      reader.onload = () => {
-                        updateForm("logoDataUrl", String(reader.result || ""));
-                      };
-                      reader.readAsDataURL(file);
-                    }}
-                  />
-                </label>
-                {f.logoDataUrl && (
-                  <button
-                    onClick={() => updateForm("logoDataUrl", "")}
-                    className="rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800"
-                  >
-                    Hapus Logo
-                  </button>
-                )}
-              </div>
-              {f.logoDataUrl && (
-                <div className="mt-3 rounded-2xl border border-slate-200 bg-white p-3">
-                  <img
-                    src={f.logoDataUrl}
-                    alt="Logo Toko"
-                    className="h-16 w-auto object-contain"
-                  />
-                </div>
-              )}
+          {f.logoDataUrl && (
+            <div className="md:col-span-2 rounded-2xl border border-slate-200 bg-white p-3">
+              <img
+                src={f.logoDataUrl}
+                alt="Logo Toko"
+                className="h-16 w-auto object-contain"
+              />
             </div>
           )}
         </div>
@@ -484,8 +306,50 @@ export default function CreateNota({
       const f = form as ParkirForm;
       return (
         <div className="grid gap-4 md:grid-cols-2">
+          <div>
+            <div className="mb-2 text-sm font-medium text-slate-700">
+              Nama Lokasi
+            </div>
+            <input
+              type="text"
+              value={f.toko}
+              onChange={(e) => updateForm("toko", e.target.value)}
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none"
+            />
+          </div>
+          <div>
+            <div className="mb-2 text-sm font-medium text-slate-700">
+              Logo Toko / Merchant
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="cursor-pointer rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800">
+                Upload Logo
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                      updateForm("logoDataUrl", String(reader.result || ""));
+                    };
+                    reader.readAsDataURL(file);
+                  }}
+                />
+              </label>
+              {f.logoDataUrl && (
+                <button
+                  onClick={() => updateForm("logoDataUrl", "")}
+                  className="rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800"
+                >
+                  Hapus
+                </button>
+              )}
+            </div>
+          </div>
           {[
-            ["Nama Lokasi", "toko", "text"],
             ...(isParkirTemplateA ? [["Alamat / Area", "alamat", "text", true]] : []),
             ["Nomor Nota", "nomor", "text"],
             ["Tanggal", "tanggal", "date"],
@@ -540,6 +404,15 @@ export default function CreateNota({
               className="min-h-[90px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none"
             />
           </div>
+          {f.logoDataUrl && (
+            <div className="md:col-span-2 rounded-2xl border border-slate-200 bg-white p-3">
+              <img
+                src={f.logoDataUrl}
+                alt="Logo Toko"
+                className="h-16 w-auto object-contain"
+              />
+            </div>
+          )}
         </div>
       );
     }
@@ -547,8 +420,50 @@ export default function CreateNota({
     const f = form as LainForm;
     return (
       <div className="grid gap-4 md:grid-cols-2">
+        <div>
+          <div className="mb-2 text-sm font-medium text-slate-700">
+            Nama Toko / Perusahaan
+          </div>
+          <input
+            type="text"
+            value={f.toko}
+            onChange={(e) => updateForm("toko", e.target.value)}
+            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none"
+          />
+        </div>
+        <div>
+          <div className="mb-2 text-sm font-medium text-slate-700">
+            Logo Toko / Merchant
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="cursor-pointer rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800">
+              Upload Logo
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = () => {
+                    updateForm("logoDataUrl", String(reader.result || ""));
+                  };
+                  reader.readAsDataURL(file);
+                }}
+              />
+            </label>
+            {f.logoDataUrl && (
+              <button
+                onClick={() => updateForm("logoDataUrl", "")}
+                className="rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800"
+              >
+                Hapus
+              </button>
+            )}
+          </div>
+        </div>
         {[
-          ["Nama Toko / Perusahaan", "toko", "text"],
           ["Alamat", "alamat", "text", true],
           ["Nomor Nota", "nomor", "text"],
           ["Tanggal", "tanggal", "date"],
@@ -611,6 +526,15 @@ export default function CreateNota({
             className="min-h-[90px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none"
           />
         </div>
+        {f.logoDataUrl && (
+          <div className="md:col-span-2 rounded-2xl border border-slate-200 bg-white p-3">
+            <img
+              src={f.logoDataUrl}
+              alt="Logo Toko"
+              className="h-16 w-auto object-contain"
+            />
+          </div>
+        )}
       </div>
     );
   }
@@ -659,6 +583,10 @@ export default function CreateNota({
                 <span>Jam</span>
                 <span>{(f as MakanForm).jam}</span>
               </div>
+              <div className="flex justify-between gap-4">
+                <span>Bayar</span>
+                <span>{(f as MakanForm).metodeBayar}</span>
+              </div>
               {isMakanTemplateA && (
                 <>
                   <div className="flex justify-between gap-4">
@@ -666,8 +594,8 @@ export default function CreateNota({
                     <span className="text-right">{(f as MakanForm).customer}</span>
                   </div>
                   <div className="flex justify-between gap-4">
-                    <span>Bayar</span>
-                    <span>{(f as MakanForm).metodeBayar}</span>
+                    <span>Layanan</span>
+                    <span>{(f as MakanForm).layanan || "-"}</span>
                   </div>
                 </>
               )}
@@ -938,6 +866,54 @@ export default function CreateNota({
                   </button>
                 ))}
               </div>
+              <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="text-sm font-semibold text-slate-900">
+                  Template Nota Tersimpan
+                </div>
+                <p className="mt-1 text-xs text-slate-600">
+                  Pilih template tersimpan untuk isi otomatis.
+                </p>
+                <div className="mt-3 space-y-2">
+                  {savedTemplatesByCategory.slice(0, 5).map((template) => (
+                    <div
+                      key={template.id}
+                      className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2"
+                    >
+                      <div className="text-sm text-slate-800">{template.name}</div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => applySavedTemplate(template.id)}
+                          className="rounded-lg bg-slate-900 px-3 py-1 text-xs font-medium text-white"
+                        >
+                          Pakai
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (
+                              window.confirm(
+                                `Hapus template \"${template.name}\"?`,
+                              )
+                            ) {
+                              deleteSavedTemplate(template.id);
+                            }
+                          }}
+                          className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-medium text-rose-700"
+                        >
+                          Hapus
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {savedTemplatesByCategory.length === 0 && (
+                    <div className="text-xs text-slate-500">
+                      Belum ada template tersimpan untuk kategori ini.
+                    </div>
+                  )}
+                </div>
+                <div className="mt-3 text-xs text-slate-500">
+                  Simpan template baru dari Step 3 (Informasi Utama).
+                </div>
+              </div>
             </section>
           )}
 
@@ -949,6 +925,33 @@ export default function CreateNota({
               <p className="mt-1 text-sm text-slate-600">
                 Isi data header, customer, waktu, dan keterangan utama nota.
               </p>
+              <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="text-sm font-semibold text-slate-900">
+                  Simpan sebagai Template
+                </div>
+                <p className="mt-1 text-xs text-slate-600">
+                  Simpan data toko/header untuk dipakai ulang di nota berikutnya.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <input
+                    value={savedTemplateName}
+                    onChange={(e) => setSavedTemplateName(e.target.value)}
+                    placeholder="Nama template baru"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none md:w-[260px]"
+                  />
+                  <button
+                    onClick={() => {
+                      const name = savedTemplateName.trim();
+                      if (!name) return;
+                      saveCurrentAsTemplate(name);
+                      setSavedTemplateName("");
+                    }}
+                    className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700"
+                  >
+                    Simpan Template
+                  </button>
+                </div>
+              </div>
               <div className="mt-5">{renderInfoFields()}</div>
             </section>
           )}
@@ -1071,7 +1074,14 @@ export default function CreateNota({
               </div>
               <div className="mt-4 flex flex-wrap gap-3">
                 <button
-                  onClick={saveCurrentNota}
+                  onClick={() =>
+                    saveCurrentNota({
+                      category,
+                      templateId: activeTemplate,
+                      form: JSON.parse(JSON.stringify(form)),
+                      items: JSON.parse(JSON.stringify(items)),
+                    })
+                  }
                   disabled={!isConfirmed}
                   className={classNames(
                     "rounded-2xl px-4 py-2 text-sm font-medium",
@@ -1140,7 +1150,27 @@ export default function CreateNota({
                 Aktif
               </div>
             </div>
-            <div className="mt-5">{renderReceipt()}</div>
+            <div className="mt-5">
+              {isLivePreviewLoading && (
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                  Memuat preview...
+                </div>
+              )}
+              {!isLivePreviewLoading && livePreviewError && (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                  {livePreviewError}
+                </div>
+              )}
+              {!isLivePreviewLoading && !livePreviewError && livePreviewUrl && (
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                  <img
+                    src={livePreviewUrl}
+                    alt="Live preview nota"
+                    className="mx-auto w-full max-w-[320px] rounded-xl border border-slate-200 bg-white"
+                  />
+                </div>
+              )}
+            </div>
           </div>
         </aside>
       </div>
