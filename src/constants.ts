@@ -24,6 +24,22 @@ export const TEMPLATE_GROUPS: Record<CategoryKey, TemplateGroup> = {
       },
     ],
   },
+  belanja: {
+    label: "Nota Belanja",
+    icon: "🛒",
+    templates: [
+      {
+        id: "belanja-a",
+        name: "Template Nota Belanja A",
+        desc: "Format belanja umum dengan data pembeli",
+      },
+      {
+        id: "belanja-b",
+        name: "Template Nota Belanja B",
+        desc: "Versi ringkas untuk pembelian cepat",
+      },
+    ],
+  },
   parkir: {
     label: "Nota Parkir",
     icon: "🅿️",
@@ -59,6 +75,7 @@ export const DEFAULT_TEMPLATE_BY_CATEGORY: SelectedTemplates = {
   makan: "makan-a",
   parkir: "parkir-a",
   lain: "lain-a",
+  belanja: "belanja-a",
 };
 
 export const INITIAL_ITEMS: ItemsState = {
@@ -68,6 +85,10 @@ export const INITIAL_ITEMS: ItemsState = {
   ],
   parkir: [{ id: 1, name: "Parkir Mobil", qty: 1, price: 10000 }],
   lain: [{ id: 1, name: "Biaya Administrasi", qty: 1, price: 35000 }],
+  belanja: [
+    { id: 1, name: "ATK Kantor", qty: 1, price: 120000 },
+    { id: 2, name: "Kertas HVS", qty: 2, price: 55000 },
+  ],
 };
 
 export const INITIAL_FORM: FormsState = {
@@ -111,6 +132,18 @@ export const INITIAL_FORM: FormsState = {
     biayaTambahanLabel: "Biaya Lain",
     biayaTambahan: 0,
   },
+  belanja: {
+    toko: "Toko Serba Ada",
+    alamat: "Jl. Gatot Subroto No. 21, Solo",
+    nomor: "BLJ-2026-0001",
+    tanggal: "2026-03-09",
+    logoDataUrl: "",
+    pembeli: "PT Indotech Trimitra Abadi",
+    metodeBayar: "Transfer",
+    catatan: "Nota belanja pengganti perusahaan.",
+    biayaTambahanLabel: "Ongkir",
+    biayaTambahan: 0,
+  },
 };
 
 export const STEP_LABELS = [
@@ -147,6 +180,15 @@ export const HISTORY_SAMPLES: HistoryRow[] = [
     toko: "CV Sumber Makmur Teknik",
     total: 35000,
     status: "Sudah dicetak",
+    tanggal: "2026-03-09",
+  },
+  {
+    id: "sample-blj-2026-0001",
+    no: "BLJ-2026-0001",
+    jenis: "Nota Belanja",
+    toko: "Toko Serba Ada",
+    total: 230000,
+    status: "Sudah disimpan",
     tanggal: "2026-03-09",
   },
 ];

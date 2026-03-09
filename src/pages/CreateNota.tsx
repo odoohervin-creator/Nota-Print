@@ -1,6 +1,7 @@
 import React from "react";
 import {
   CategoryKey,
+  BelanjaForm,
   FormsState,
   ItemsState,
   ItemRow,
@@ -36,7 +37,6 @@ interface CreateNotaProps {
   savedNotaTemplates: SavedNotaTemplate[];
   saveCurrentAsTemplate: (name: string) => void;
   applySavedTemplate: (id: string) => void;
-  deleteSavedTemplate: (id: string) => void;
   paperWidth: PaperWidth;
   templateGroups: Record<CategoryKey, TemplateGroup>;
 }
@@ -59,10 +59,68 @@ export default function CreateNota({
   savedNotaTemplates,
   saveCurrentAsTemplate,
   applySavedTemplate,
-  deleteSavedTemplate,
   paperWidth,
   templateGroups,
 }: CreateNotaProps) {
+  const renderCategoryIcon = (key: CategoryKey, active: boolean) => {
+    const baseClass = "h-7 w-7";
+    const colorClass = active ? "text-white" : "text-red-600";
+    if (key === "makan") {
+      return (
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          className={`${baseClass} ${colorClass}`}
+        >
+          <path d="M4 3v8M6.5 3v8M4 7h2.5M10 3v18M15 4h2a3 3 0 0 1 3 3v14" />
+        </svg>
+      );
+    }
+    if (key === "parkir") {
+      return (
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          className={`${baseClass} ${colorClass}`}
+        >
+          <rect x="4" y="3" width="16" height="18" rx="3" />
+          <path d="M9 17V7h4.2a2.4 2.4 0 1 1 0 4.8H9" />
+        </svg>
+      );
+    }
+    if (key === "belanja") {
+      return (
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          className={`${baseClass} ${colorClass}`}
+        >
+          <path d="M3 5h2l2.2 10.2a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 2-1.6L22 8H7.2" />
+          <circle cx="10" cy="20" r="1.5" />
+          <circle cx="18" cy="20" r="1.5" />
+        </svg>
+      );
+    }
+    return (
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        className={`${baseClass} ${colorClass}`}
+      >
+        <path d="M6 3h9l5 5v13H6z" />
+        <path d="M15 3v5h5M9 12h8M9 16h6" />
+      </svg>
+    );
+  };
+
   const [isConfirmed, setIsConfirmed] = React.useState(false);
   const [livePreviewUrl, setLivePreviewUrl] = React.useState("");
   const [isLivePreviewLoading, setIsLivePreviewLoading] = React.useState(false);
@@ -78,7 +136,15 @@ export default function CreateNota({
   const isLainTemplateA = category === "lain" && activeTemplate === "lain-a";
   const isLainTemplateB = category === "lain" && activeTemplate === "lain-b";
   const isLainTemplateC = category === "lain" && activeTemplate === "lain-c";
-  const showExtraRow = category === "makan" || isParkirTemplateA || isLainTemplateA;
+  const isBelanjaTemplateA =
+    category === "belanja" && activeTemplate === "belanja-a";
+  const isBelanjaTemplateB =
+    category === "belanja" && activeTemplate === "belanja-b";
+  const showExtraRow =
+    category === "makan" ||
+    isBelanjaTemplateA ||
+    isParkirTemplateA ||
+    isLainTemplateA;
   const [savedTemplateName, setSavedTemplateName] = React.useState("");
   const form = forms[category];
   const items = itemsByCategory[category];
@@ -93,6 +159,9 @@ export default function CreateNota({
     }
     if (category === "lain" && templateId === "lain-c") {
       return "Untuk nota pengganti kantor / reimbursement.";
+    }
+    if (category === "belanja" && templateId === "belanja-b") {
+      return "Versi ringkas untuk transaksi belanja cepat.";
     }
     return "Template siap pakai.";
   };
@@ -417,6 +486,120 @@ export default function CreateNota({
       );
     }
 
+    if (category === "belanja") {
+      const f = form as BelanjaForm;
+      return (
+        <div className="grid gap-4 md:grid-cols-2">
+          <div>
+            <div className="mb-2 text-sm font-medium text-slate-700">
+              Nama Toko
+            </div>
+            <input
+              type="text"
+              value={f.toko}
+              onChange={(e) => updateForm("toko", e.target.value)}
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none"
+            />
+          </div>
+          <div>
+            <div className="mb-2 text-sm font-medium text-slate-700">
+              Logo Toko / Merchant
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="cursor-pointer rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800">
+                Upload Logo
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                      updateForm("logoDataUrl", String(reader.result || ""));
+                    };
+                    reader.readAsDataURL(file);
+                  }}
+                />
+              </label>
+              {f.logoDataUrl && (
+                <button
+                  onClick={() => updateForm("logoDataUrl", "")}
+                  className="rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800"
+                >
+                  Hapus
+                </button>
+              )}
+            </div>
+          </div>
+          {[
+            ["Alamat", "alamat", "text", true],
+            ["Nomor Nota", "nomor", "text"],
+            ["Tanggal", "tanggal", "date"],
+            ...(isBelanjaTemplateA
+              ? [["Atas Nama Pembeli", "pembeli", "text"]]
+              : []),
+            ["Metode Bayar", "metodeBayar", "text"],
+            ...(isBelanjaTemplateA
+              ? [["Label Biaya Tambahan", "biayaTambahanLabel", "text"]]
+              : []),
+          ].map(([label, field, type, wide], index) => (
+            <div
+              key={`${String(field)}-${index}`}
+              className={wide ? "md:col-span-2" : ""}
+            >
+              <div className="mb-2 text-sm font-medium text-slate-700">
+                {label}
+              </div>
+              <input
+                type={type as string}
+                value={String(
+                  (f as Record<string, string | number>)[field as string],
+                )}
+                onChange={(e) => updateForm(field as string, e.target.value)}
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none"
+              />
+            </div>
+          ))}
+          {isBelanjaTemplateA && (
+            <div>
+              <div className="mb-2 text-sm font-medium text-slate-700">
+                Nominal Biaya Tambahan
+              </div>
+              <input
+                type="number"
+                value={f.biayaTambahan}
+                onChange={(e) =>
+                  updateForm("biayaTambahan", Number(e.target.value))
+                }
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none"
+              />
+            </div>
+          )}
+          <div className="md:col-span-2">
+            <div className="mb-2 text-sm font-medium text-slate-700">
+              Catatan
+            </div>
+            <textarea
+              value={f.catatan}
+              onChange={(e) => updateForm("catatan", e.target.value)}
+              className="min-h-[90px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none"
+            />
+          </div>
+          {f.logoDataUrl && (
+            <div className="md:col-span-2 rounded-2xl border border-slate-200 bg-white p-3">
+              <img
+                src={f.logoDataUrl}
+                alt="Logo Toko"
+                className="h-16 w-auto object-contain"
+              />
+            </div>
+          )}
+        </div>
+      );
+    }
+
     const f = form as LainForm;
     return (
       <div className="grid gap-4 md:grid-cols-2">
@@ -541,7 +724,9 @@ export default function CreateNota({
 
   function renderReceipt() {
     const f = form as any;
-    const showLogo = isMakanTemplateA && Boolean((f as MakanForm).logoDataUrl);
+    const showLogo =
+      (isMakanTemplateA || isBelanjaTemplateA) &&
+      Boolean((f as MakanForm).logoDataUrl);
     return (
       <div
         className="mx-auto rounded-[28px] border border-slate-300 bg-white p-4 shadow-md"
@@ -558,7 +743,7 @@ export default function CreateNota({
         )}
         <div className="text-center">
           <div className="text-sm font-bold uppercase">{f.toko}</div>
-          {!(isMakanTemplateB || isParkirTemplateB) && (
+          {!(isMakanTemplateB || isParkirTemplateB || isBelanjaTemplateB) && (
             <div className="mt-1 text-[11px] leading-4 text-slate-600">
               {f.alamat}
             </div>
@@ -663,6 +848,20 @@ export default function CreateNota({
               </div>
             </>
           )}
+          {category === "belanja" && (
+            <>
+              {isBelanjaTemplateA && (
+                <div className="flex justify-between gap-4">
+                  <span>Pembeli</span>
+                  <span className="text-right">{(f as BelanjaForm).pembeli}</span>
+                </div>
+              )}
+              <div className="flex justify-between gap-4">
+                <span>Bayar</span>
+                <span>{(f as BelanjaForm).metodeBayar}</span>
+              </div>
+            </>
+          )}
         </div>
 
         <div className="my-3 border-t border-dashed border-slate-300" />
@@ -712,7 +911,7 @@ export default function CreateNota({
           </div>
         </div>
 
-        {!(isMakanTemplateB || isLainTemplateB || isParkirTemplateB) && (
+        {!(isMakanTemplateB || isLainTemplateB || isParkirTemplateB || isBelanjaTemplateB) && (
           <>
             <div className="my-3 border-t border-dashed border-slate-300" />
             <div className="text-center text-[10px] leading-4 text-slate-600">
@@ -747,7 +946,7 @@ export default function CreateNota({
                 className={classNames(
                   "flex items-center gap-2 rounded-xl border px-3 py-2 text-left transition",
                   active
-                    ? "border-slate-900 bg-slate-900 text-white"
+                    ? "border-[#ef4444] bg-[#ef4444] text-white"
                     : done
                       ? "border-slate-300 bg-slate-100 text-slate-800"
                       : "border-slate-200 bg-white text-slate-500",
@@ -759,7 +958,7 @@ export default function CreateNota({
                     active
                       ? "bg-white text-slate-900"
                       : done
-                        ? "bg-slate-900 text-white"
+                        ? "bg-[#ef4444] text-white"
                         : "bg-slate-100 text-slate-700",
                   )}
                 >
@@ -799,7 +998,7 @@ export default function CreateNota({
                 Pilih kategori dulu, supaya template dan field otomatis
                 menyesuaikan.
               </p>
-              <div className="mt-5 grid gap-4 md:grid-cols-3">
+              <div className="mt-5 grid gap-4 md:grid-cols-2">
                 {Object.entries(templateGroups).map(([key, value]) => (
                   <button
                     key={key}
@@ -807,11 +1006,11 @@ export default function CreateNota({
                     className={classNames(
                       "rounded-3xl border p-5 text-left transition",
                       category === key
-                        ? "border-slate-900 bg-slate-900 text-white"
+                        ? "border-[#ef4444] bg-[#ef4444] text-white"
                         : "border-slate-200 bg-slate-50 text-slate-900 hover:bg-slate-100",
                     )}
                   >
-                    <div className="text-2xl">{value.icon}</div>
+                    <div>{renderCategoryIcon(key as CategoryKey, category === key)}</div>
                     <div className="mt-4 text-base font-semibold">
                       {value.label}
                     </div>
@@ -848,7 +1047,7 @@ export default function CreateNota({
                     className={classNames(
                       "rounded-3xl border p-5 text-left transition",
                       activeTemplate === tpl.id
-                        ? "border-slate-900 bg-slate-900 text-white"
+                        ? "border-[#ef4444] bg-[#ef4444] text-white"
                         : "border-slate-200 bg-slate-50 text-slate-900 hover:bg-slate-100",
                     )}
                   >
@@ -883,23 +1082,9 @@ export default function CreateNota({
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => applySavedTemplate(template.id)}
-                          className="rounded-lg bg-slate-900 px-3 py-1 text-xs font-medium text-white"
+                          className="rounded-lg bg-[#ef4444] px-3 py-1 text-xs font-medium text-white hover:bg-[#dc2626]"
                         >
                           Pakai
-                        </button>
-                        <button
-                          onClick={() => {
-                            if (
-                              window.confirm(
-                                `Hapus template \"${template.name}\"?`,
-                              )
-                            ) {
-                              deleteSavedTemplate(template.id);
-                            }
-                          }}
-                          className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-medium text-rose-700"
-                        >
-                          Hapus
                         </button>
                       </div>
                     </div>
@@ -969,7 +1154,7 @@ export default function CreateNota({
                 </div>
                 <button
                   onClick={addItem}
-                  className="rounded-2xl bg-slate-900 px-4 py-2 text-sm font-medium text-white"
+                  className="rounded-2xl bg-[#ef4444] px-4 py-2 text-sm font-medium text-white hover:bg-[#dc2626]"
                 >
                   + Tambah Item
                 </button>
@@ -1098,7 +1283,7 @@ export default function CreateNota({
                   className={classNames(
                     "rounded-2xl px-4 py-2 text-sm font-medium",
                     isConfirmed
-                      ? "bg-slate-900 text-white"
+                      ? "bg-[#ef4444] text-white hover:bg-[#dc2626]"
                       : "bg-slate-100 text-slate-400",
                   )}
                 >
@@ -1131,7 +1316,7 @@ export default function CreateNota({
                 "rounded-2xl px-4 py-2 text-sm font-medium",
                 step === 5
                   ? "bg-slate-100 text-slate-400"
-                  : "bg-slate-900 text-white",
+                  : "bg-[#ef4444] text-white hover:bg-[#dc2626]",
               )}
             >
               Next →

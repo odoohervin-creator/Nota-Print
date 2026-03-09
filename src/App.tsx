@@ -28,6 +28,95 @@ import SettingsPage from "./pages/SettingsPage";
 import SavedTemplatesPage from "./pages/SavedTemplatesPage";
 
 export default function App() {
+  const renderNavIcon = (icon: string) => {
+    const baseClass = "h-5 w-5";
+    switch (icon) {
+      case "dashboard":
+        return (
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            className={baseClass}
+          >
+            <path d="M3 11.5L12 4l9 7.5" />
+            <path d="M5 10.5V20h14v-9.5" />
+          </svg>
+        );
+      case "buat":
+        return (
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            className={baseClass}
+          >
+            <rect x="5" y="3.5" width="14" height="17" rx="2" />
+            <path d="M8.5 8h7M8.5 12h7M8.5 16h4.5" />
+            <path d="M18.5 2v4M16.5 4h4" />
+          </svg>
+        );
+      case "riwayat":
+        return (
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            className={baseClass}
+          >
+            <path d="M12 8v5l3 2" />
+            <path d="M3 12a9 9 0 1 0 3-6.7" />
+            <path d="M3 4v4h4" />
+          </svg>
+        );
+      case "template":
+        return (
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            className={baseClass}
+          >
+            <path d="M4 6h11l5 5v7a2 2 0 0 1-2 2H4z" />
+            <path d="M15 6v5h5" />
+            <path d="M8 14h8M8 17h6" />
+          </svg>
+        );
+      case "settings":
+        return (
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            className={baseClass}
+          >
+            <path d="M12 15.5A3.5 3.5 0 1 0 12 8.5a3.5 3.5 0 0 0 0 7z" />
+            <path d="M19.4 15a1 1 0 0 0 .2 1.1l.1.1a1.8 1.8 0 0 1-2.5 2.5l-.1-.1a1 1 0 0 0-1.1-.2 1 1 0 0 0-.6.9V20a1.8 1.8 0 0 1-3.6 0v-.2a1 1 0 0 0-.6-.9 1 1 0 0 0-1.1.2l-.1.1a1.8 1.8 0 1 1-2.5-2.5l.1-.1a1 1 0 0 0 .2-1.1 1 1 0 0 0-.9-.6H4a1.8 1.8 0 0 1 0-3.6h.2a1 1 0 0 0 .9-.6 1 1 0 0 0-.2-1.1l-.1-.1a1.8 1.8 0 1 1 2.5-2.5l.1.1a1 1 0 0 0 1.1.2 1 1 0 0 0 .6-.9V4a1.8 1.8 0 0 1 3.6 0v.2a1 1 0 0 0 .6.9 1 1 0 0 0 1.1-.2l.1-.1a1.8 1.8 0 1 1 2.5 2.5l-.1.1a1 1 0 0 0-.2 1.1 1 1 0 0 0 .9.6H20a1.8 1.8 0 0 1 0 3.6h-.2a1 1 0 0 0-.9.6z" />
+          </svg>
+        );
+      case "cara":
+        return (
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            className={baseClass}
+          >
+            <path d="M5 4.5h9a3 3 0 0 1 3 3V19.5H8a3 3 0 0 0-3 3z" />
+            <path d="M19 19.5h-9a3 3 0 0 0-3 3V7.5a3 3 0 0 1 3-3h9z" />
+            <path d="M10 9h6M10 12.5h6" />
+          </svg>
+        );
+      default:
+        return null;
+    }
+  };
   const HISTORY_STORAGE_KEY = "nota-print-history-v1";
   const SETTINGS_STORAGE_KEY = "nota-print-settings-v1";
   const TEMPLATE_STORAGE_KEY = "nota-print-template-groups-v1";
@@ -35,14 +124,16 @@ export default function App() {
   const DEFAULT_SETTINGS: AppSettings = {
     paperWidth: 58,
     printerName: "EPSON TM-T82X",
-    storeName: "NotaPrint Store",
-    storeAddress: "Jl. Contoh No. 1",
+    storeName: "PT Indotech Trimitra Abadi",
+    storeAddress:
+      "Jl. Kelapa Gading No.2 Klodran Indah, Colomadu, Karanganyar, Jawa Tengah.",
   };
   const [page, setPage] = useState<PageKey>("dashboard");
   const [step, setStep] = useState<number>(1);
   const [category, setCategory] = useState<CategoryKey>("makan");
-  const [selectedTemplates, setSelectedTemplates] =
-    useState<SelectedTemplates>(DEFAULT_TEMPLATE_BY_CATEGORY);
+  const [selectedTemplates, setSelectedTemplates] = useState<SelectedTemplates>(
+    DEFAULT_TEMPLATE_BY_CATEGORY,
+  );
   const [forms, setForms] = useState<FormsState>(INITIAL_FORM);
   const [itemsByCategory, setItemsByCategory] =
     useState<ItemsState>(INITIAL_ITEMS);
@@ -96,11 +187,11 @@ export default function App() {
       if (!raw) {
         return TEMPLATE_GROUPS;
       }
-      const parsed = JSON.parse(raw) as Record<CategoryKey, TemplateGroup>;
-      if (!parsed?.makan || !parsed?.parkir || !parsed?.lain) {
-        return TEMPLATE_GROUPS;
-      }
-      return parsed;
+      const parsed = JSON.parse(raw) as Partial<Record<CategoryKey, TemplateGroup>>;
+      return {
+        ...TEMPLATE_GROUPS,
+        ...parsed,
+      };
     } catch {
       return TEMPLATE_GROUPS;
     }
@@ -125,7 +216,10 @@ export default function App() {
     if (typeof window === "undefined") {
       return;
     }
-    window.localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(historyRows));
+    window.localStorage.setItem(
+      HISTORY_STORAGE_KEY,
+      JSON.stringify(historyRows),
+    );
   }, [historyRows]);
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -183,7 +277,12 @@ export default function App() {
         ...prev[category],
         {
           id: Date.now(),
-          name: category === "parkir" ? "Biaya Parkir" : "Item Baru",
+          name:
+            category === "parkir"
+              ? "Biaya Parkir"
+              : category === "belanja"
+                ? "Barang Belanja"
+                : "Item Baru",
           qty: 1,
           price: 0,
         },
@@ -272,7 +371,9 @@ export default function App() {
   const renameSavedTemplate = (id: string, name: string) => {
     setSavedNotaTemplates((prev) =>
       prev.map((item) =>
-        item.id === id ? { ...item, name, updatedAt: new Date().toISOString() } : item,
+        item.id === id
+          ? { ...item, name, updatedAt: new Date().toISOString() }
+          : item,
       ),
     );
   };
@@ -361,11 +462,17 @@ export default function App() {
       setHistoryRows(data.historyRows as HistoryRow[]);
     }
 
-    if (data.templateGroups?.makan && data.templateGroups?.parkir && data.templateGroups?.lain) {
-      setTemplateGroups(data.templateGroups as Record<CategoryKey, TemplateGroup>);
+    if (data.templateGroups && typeof data.templateGroups === "object") {
+      const mergedTemplateGroups = {
+        ...TEMPLATE_GROUPS,
+        ...data.templateGroups,
+      } as Record<CategoryKey, TemplateGroup>;
+      setTemplateGroups(
+        mergedTemplateGroups,
+      );
       window.localStorage.setItem(
         TEMPLATE_STORAGE_KEY,
-        JSON.stringify(data.templateGroups),
+        JSON.stringify(mergedTemplateGroups),
       );
     }
 
@@ -377,16 +484,25 @@ export default function App() {
       );
     }
 
-    if (data.selectedTemplates?.makan && data.selectedTemplates?.parkir && data.selectedTemplates?.lain) {
-      setSelectedTemplates(data.selectedTemplates as SelectedTemplates);
+    if (data.selectedTemplates && typeof data.selectedTemplates === "object") {
+      setSelectedTemplates({
+        ...DEFAULT_TEMPLATE_BY_CATEGORY,
+        ...data.selectedTemplates,
+      });
     }
 
-    if (data.forms?.makan && data.forms?.parkir && data.forms?.lain) {
-      setForms(data.forms as FormsState);
+    if (data.forms && typeof data.forms === "object") {
+      setForms({
+        ...INITIAL_FORM,
+        ...data.forms,
+      } as FormsState);
     }
 
-    if (data.itemsByCategory?.makan && data.itemsByCategory?.parkir && data.itemsByCategory?.lain) {
-      setItemsByCategory(data.itemsByCategory as ItemsState);
+    if (data.itemsByCategory && typeof data.itemsByCategory === "object") {
+      setItemsByCategory({
+        ...INITIAL_ITEMS,
+        ...data.itemsByCategory,
+      } as ItemsState);
     }
   };
 
@@ -405,45 +521,63 @@ export default function App() {
     });
   }, [templateGroups]);
 
-  const navItems: Array<{ key: PageKey; label: string }> = [
-    { key: "dashboard", label: "Dashboard" },
-    { key: "buat", label: "Buat Nota Baru" },
-    { key: "riwayat", label: "Riwayat Cetak" },
-    { key: "template", label: "Template Tersimpan" },
-    { key: "settings", label: "Pengaturan" },
-    { key: "cara", label: "Cara Menggunakan" },
+  const navItems: Array<{ key: PageKey; label: string; icon: string }> = [
+    { key: "dashboard", label: "Dashboard", icon: "dashboard" },
+    { key: "buat", label: "Buat Nota Baru", icon: "buat" },
+    { key: "riwayat", label: "Riwayat Cetak", icon: "riwayat" },
+    { key: "template", label: "Template Tersimpan", icon: "template" },
+    { key: "settings", label: "Pengaturan", icon: "settings" },
+    { key: "cara", label: "Cara Menggunakan", icon: "cara" },
   ];
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900">
+    <div className="min-h-screen bg-neutral-50 text-slate-900">
       <div className="grid min-h-screen lg:grid-cols-[280px_1fr]">
-        <aside className="border-r border-slate-200 bg-white p-5">
+        <aside className="flex flex-col border-r border-black/40 bg-black p-5 lg:sticky lg:top-0 lg:h-screen lg:overflow-y-auto">
           <div className="mb-8">
-            <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-              Desktop App Starter
+            <div className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-200/80">
+              DESKTOP APP
             </div>
-            <h1 className="mt-2 text-2xl font-bold">NotaPrint</h1>
-            <div className="mt-1 text-xs font-medium text-slate-500">V.1.0.1</div>
-            <p className="mt-2 text-sm text-slate-600">
-              Dashboard + multi-step create note flow.
+            <h1 className="mt-2 text-2xl font-bold text-white">NotaPrint</h1>
+            <div className="mt-1 text-xs font-medium text-blue-100/80">
+              V.1.0.1
+            </div>
+            <p className="mt-2 text-sm text-blue-100/90">
+              {settings.storeName}
             </p>
           </div>
           <nav className="space-y-2">
-            {navItems.map((item) => (
-              <button
-                key={item.key}
-                onClick={() => setPage(item.key)}
-                className={classNames(
-                  "w-full rounded-2xl px-4 py-3 text-left text-sm font-medium transition",
-                  page === item.key
-                    ? "bg-slate-900 text-white shadow-sm"
-                    : "bg-slate-50 text-slate-700 hover:bg-slate-100",
-                )}
-              >
-                {item.label}
-              </button>
-            ))}
+            {navItems.map((item) => {
+              const isActive = page === item.key;
+              return (
+                <button
+                  key={item.key}
+                  onClick={() => setPage(item.key)}
+                  className={classNames(
+                    "flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-medium transition",
+                    isActive
+                      ? "bg-[#ef4444] text-white shadow-sm"
+                      : "bg-slate-800/80 text-slate-100 hover:bg-slate-700",
+                  )}
+                >
+                  <span
+                    className={classNames(
+                      "flex h-7 w-7 items-center justify-center rounded-lg",
+                      isActive
+                        ? "bg-white/60 text-slate-900"
+                        : "bg-slate-700/80 text-slate-100",
+                    )}
+                  >
+                    {renderNavIcon(item.icon)}
+                  </span>
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
           </nav>
+          <div className="mt-auto pt-6 text-left text-xs font-medium text-blue-100/70">
+            MIT Indotechgroup
+          </div>
         </aside>
         <main className="p-6 lg:p-8">
           {page === "dashboard" && (
@@ -451,6 +585,7 @@ export default function App() {
               goCreateNew={goCreateNew}
               setCategory={setCategory}
               templateGroups={templateGroups}
+              savedNotaTemplates={savedNotaTemplates}
               historyRows={historyRows}
               settings={settings}
               viewHistory={() => setPage("riwayat")}
@@ -475,7 +610,6 @@ export default function App() {
               savedNotaTemplates={savedNotaTemplates}
               saveCurrentAsTemplate={saveCurrentAsTemplate}
               applySavedTemplate={applySavedTemplate}
-              deleteSavedTemplate={deleteSavedTemplate}
               paperWidth={settings.paperWidth}
               templateGroups={templateGroups}
             />

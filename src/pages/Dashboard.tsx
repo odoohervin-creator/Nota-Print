@@ -1,5 +1,11 @@
 import React from "react";
-import { AppSettings, CategoryKey, HistoryRow, TemplateGroup } from "../types";
+import {
+  AppSettings,
+  CategoryKey,
+  HistoryRow,
+  SavedNotaTemplate,
+  TemplateGroup,
+} from "../types";
 import StatCard from "../components/StatCard";
 import { formatRupiah } from "../utils";
 
@@ -7,6 +13,7 @@ interface DashboardProps {
   goCreateNew: () => void;
   setCategory: React.Dispatch<React.SetStateAction<CategoryKey>>;
   templateGroups: Record<CategoryKey, TemplateGroup>;
+  savedNotaTemplates: SavedNotaTemplate[];
   historyRows: HistoryRow[];
   settings: AppSettings;
   viewHistory?: () => void;
@@ -16,15 +23,47 @@ export default function Dashboard({
   goCreateNew,
   setCategory,
   templateGroups,
+  savedNotaTemplates,
   historyRows,
   settings,
   viewHistory,
 }: DashboardProps) {
+  const renderCategoryIcon = (key: CategoryKey) => {
+    const baseClass = "h-7 w-7";
+    if (key === "makan") {
+      return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={baseClass}>
+          <path d="M4 3v8M6.5 3v8M4 7h2.5M10 3v18M15 4h2a3 3 0 0 1 3 3v14" />
+        </svg>
+      );
+    }
+    if (key === "parkir") {
+      return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={baseClass}>
+          <rect x="4" y="3" width="16" height="18" rx="3" />
+          <path d="M9 17V7h4.2a2.4 2.4 0 1 1 0 4.8H9" />
+        </svg>
+      );
+    }
+    if (key === "belanja") {
+      return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={baseClass}>
+          <path d="M3 5h2l2.2 10.2a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 2-1.6L22 8H7.2" />
+          <circle cx="10" cy="20" r="1.5" />
+          <circle cx="18" cy="20" r="1.5" />
+        </svg>
+      );
+    }
+    return (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={baseClass}>
+        <path d="M6 3h9l5 5v13H6z" />
+        <path d="M15 3v5h5M9 12h8M9 16h6" />
+      </svg>
+    );
+  };
+
   const todayKey = new Intl.DateTimeFormat("en-CA").format(new Date());
-  const totalTemplateCount = Object.values(templateGroups).reduce(
-    (acc, group) => acc + group.templates.length,
-    0,
-  );
+  const totalSavedTemplateCount = savedNotaTemplates.length;
   const totalNota = historyRows.length;
   const unprintedCount = historyRows.filter(
     (row) => !row.status.toLowerCase().includes("dicetak"),
@@ -48,7 +87,7 @@ export default function Dashboard({
         <div className="flex gap-3">
           <button
             onClick={goCreateNew}
-            className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-medium text-white shadow-sm"
+            className="rounded-2xl bg-[#ef4444] px-5 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-[#dc2626]"
           >
             + Buat Nota Baru
           </button>
@@ -59,27 +98,28 @@ export default function Dashboard({
         <StatCard
           label="Total Nota"
           value={`${totalNota}`}
-          hint={`total data per ${todayKey}`}
+          hint={`total data hari ini (${todayKey})`}
         />
         <StatCard
           label="Belum Dicetak"
           value={`${unprintedCount}`}
-          hint="akan berkurang saat nota dicetak"
+          hint="antrian nota yang belum dicetak"
         />
         <StatCard
           label="Sudah Dicetak"
           value={`${printedCount}`}
-          hint="naik saat cetak dari riwayat nota"
+          hint="nota yang sudah berhasil dicetak"
         />
         <StatCard
-          label="Template Aktif"
-          value={`${totalTemplateCount}`}
-          hint="makan, parkir, dan nota lain"
+          label="Template Tersimpan"
+          value={`${totalSavedTemplateCount}`}
+          hint="preset yang siap dipakai ulang"
         />
         <StatCard
           label="Printer Default"
           value={`Thermal ${settings.paperWidth}mm`}
-          hint={settings.printerName || "Printer belum diatur"}
+          hint={settings.printerName || "printer belum diatur"}
+          valueClassName="text-xl leading-tight"
         />
       </div>
 
@@ -90,7 +130,7 @@ export default function Dashboard({
             Mulai dari kategori yang paling sering dipakai.
           </p>
         </div>
-        <div className="mt-5 grid gap-4 md:grid-cols-3">
+        <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {Object.entries(templateGroups).map(([key, group]) => (
             <button
               key={key}
@@ -100,7 +140,7 @@ export default function Dashboard({
               }}
               className="rounded-3xl border border-slate-200 bg-slate-50 p-5 text-left transition hover:bg-slate-100"
             >
-              <div className="text-2xl">{group.icon}</div>
+              <div className="text-red-600">{renderCategoryIcon(key as CategoryKey)}</div>
               <div className="mt-4 text-base font-semibold text-slate-900">
                 {group.label}
               </div>

@@ -1,4 +1,5 @@
 import {
+  BelanjaForm,
   LainForm,
   MakanForm,
   PaperWidth,
@@ -57,7 +58,7 @@ export async function buildReceiptImageDataUrl(
   paperWidth: PaperWidth,
 ): Promise<string> {
   const { category, templateId } = snapshot;
-  const form = snapshot.form as MakanForm | ParkirForm | LainForm;
+  const form = snapshot.form as MakanForm | ParkirForm | LainForm | BelanjaForm;
   const items = Array.isArray(snapshot.items) ? snapshot.items : [];
   const subtotal = items.reduce(
     (acc, item) => acc + Number(item.qty || 0) * Number(item.price || 0),
@@ -73,6 +74,10 @@ export async function buildReceiptImageDataUrl(
   const isLainTemplateA = category === "lain" && templateId === "lain-a";
   const isLainTemplateB = category === "lain" && templateId === "lain-b";
   const isLainTemplateC = category === "lain" && templateId === "lain-c";
+  const isBelanjaTemplateA =
+    category === "belanja" && templateId === "belanja-a";
+  const isBelanjaTemplateB =
+    category === "belanja" && templateId === "belanja-b";
   const isTemplateA = templateId.endsWith("-a");
   const isTemplateB = templateId.endsWith("-b");
   const isTemplateC = templateId.endsWith("-c");
@@ -122,6 +127,14 @@ export async function buildReceiptImageDataUrl(
       { label: "Pembeli", value: (form as LainForm).pihak || "-" },
       { label: "Keperluan", value: (form as LainForm).keterangan || "-" },
     );
+  }
+  if (isBelanjaTemplateA) {
+    infoRows.push(
+      { label: "Pembeli", value: (form as BelanjaForm).pembeli || "-" },
+      { label: "Bayar", value: (form as BelanjaForm).metodeBayar || "-" },
+    );
+  } else if (isBelanjaTemplateB) {
+    infoRows.push({ label: "Bayar", value: (form as BelanjaForm).metodeBayar || "-" });
   }
 
   const paperPx = paperWidth === 80 ? 576 : 420;
@@ -266,7 +279,7 @@ export async function buildReceiptImageDataUrl(
   row("TOTAL", formatRupiah(total), true);
   divider(true);
 
-  if (!(isMakanTemplateB || isLainTemplateB || isParkirTemplateB)) {
+  if (!(isMakanTemplateB || isLainTemplateB || isParkirTemplateB || isBelanjaTemplateB)) {
     wrapText(ctx, form.catatan || "-", innerWidth).forEach((line) => centerLine(line));
   }
   y += 8;

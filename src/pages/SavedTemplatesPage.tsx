@@ -12,6 +12,7 @@ const categoryLabel: Record<SavedNotaTemplate["category"], string> = {
   makan: "Nota Makan",
   parkir: "Nota Parkir",
   lain: "Nota Lain",
+  belanja: "Nota Belanja",
 };
 
 export default function SavedTemplatesPage({
@@ -22,6 +23,9 @@ export default function SavedTemplatesPage({
 }: SavedTemplatesPageProps) {
   const [query, setQuery] = React.useState("");
   const [categoryFilter, setCategoryFilter] = React.useState("all");
+  const [editingTemplate, setEditingTemplate] =
+    React.useState<SavedNotaTemplate | null>(null);
+  const [editingName, setEditingName] = React.useState("");
 
   const filteredTemplates = React.useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -35,6 +39,19 @@ export default function SavedTemplatesPage({
       return byCategory && byQuery;
     });
   }, [templates, query, categoryFilter]);
+
+  const closeEditModal = () => {
+    setEditingTemplate(null);
+    setEditingName("");
+  };
+
+  const submitEditTemplate = () => {
+    if (!editingTemplate) return;
+    const nextName = editingName.trim();
+    if (!nextName) return;
+    onRenameTemplate(editingTemplate.id, nextName);
+    closeEditModal();
+  };
 
   return (
     <div className="space-y-6">
@@ -62,6 +79,7 @@ export default function SavedTemplatesPage({
             <option value="makan">Nota Makan</option>
             <option value="parkir">Nota Parkir</option>
             <option value="lain">Nota Lain</option>
+            <option value="belanja">Nota Belanja</option>
           </select>
         </div>
 
@@ -87,19 +105,14 @@ export default function SavedTemplatesPage({
                     <div className="flex flex-wrap gap-2">
                       <button
                         onClick={() => onUseTemplate(template.id)}
-                        className="rounded-xl bg-slate-900 px-3 py-1 text-xs font-medium text-white"
+                        className="rounded-xl bg-[#ef4444] px-3 py-1 text-xs font-medium text-white hover:bg-[#dc2626]"
                       >
                         Pakai
                       </button>
                       <button
                         onClick={() => {
-                          const nextName = window.prompt(
-                            "Ubah nama template:",
-                            template.name,
-                          );
-                          if (nextName && nextName.trim()) {
-                            onRenameTemplate(template.id, nextName.trim());
-                          }
+                          setEditingTemplate(template);
+                          setEditingName(template.name);
                         }}
                         className="rounded-xl border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-700"
                       >
@@ -129,6 +142,50 @@ export default function SavedTemplatesPage({
           </table>
         </div>
       </div>
+
+      {editingTemplate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4">
+          <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-5 shadow-xl">
+            <h3 className="text-lg font-semibold text-slate-900">
+              Edit Nama Template
+            </h3>
+            <p className="mt-1 text-sm text-slate-600">
+              Ubah nama template tersimpan.
+            </p>
+            <div className="mt-4">
+              <label className="mb-2 block text-sm font-medium text-slate-700">
+                Nama Template
+              </label>
+              <input
+                value={editingName}
+                onChange={(e) => setEditingName(e.target.value)}
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none"
+                placeholder="Masukkan nama template"
+                autoFocus
+              />
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                onClick={closeEditModal}
+                className="rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700"
+              >
+                Batal
+              </button>
+              <button
+                onClick={submitEditTemplate}
+                disabled={!editingName.trim()}
+                className={`rounded-2xl px-4 py-2 text-sm font-medium ${
+                  editingName.trim()
+                    ? "bg-[#ef4444] text-white hover:bg-[#dc2626]"
+                    : "bg-slate-100 text-slate-400"
+                }`}
+              >
+                Simpan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

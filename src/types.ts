@@ -1,4 +1,4 @@
-export type CategoryKey = "makan" | "parkir" | "lain";
+export type CategoryKey = "makan" | "parkir" | "lain" | "belanja";
 
 export type TemplateItem = {
   id: string;
@@ -66,6 +66,7 @@ export type FormsState = {
   makan: MakanForm;
   parkir: ParkirForm;
   lain: LainForm;
+  belanja: BelanjaForm;
 };
 
 export type ItemsState = Record<CategoryKey, ItemRow[]>;
@@ -75,7 +76,7 @@ export type SelectedTemplates = Record<CategoryKey, string>;
 export type PrintSnapshot = {
   category: CategoryKey;
   templateId: string;
-  form: MakanForm | ParkirForm | LainForm;
+  form: MakanForm | ParkirForm | LainForm | BelanjaForm;
   items: ItemRow[];
 };
 
@@ -113,7 +114,20 @@ export type SavedNotaTemplate = {
   name: string;
   category: CategoryKey;
   templateId: string;
-  form: MakanForm | ParkirForm | LainForm;
+  form: MakanForm | ParkirForm | LainForm | BelanjaForm;
   items: ItemRow[];
   updatedAt: string;
+};
+
+export type BelanjaForm = {
+  toko: string;
+  alamat: string;
+  nomor: string;
+  tanggal: string;
+  logoDataUrl: string;
+  pembeli: string;
+  metodeBayar: string;
+  catatan: string;
+  biayaTambahanLabel: string;
+  biayaTambahan: number;
 };
