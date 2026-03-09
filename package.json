@@ -10,7 +10,7 @@
     "build:web": "tsc -b && vite build",
     "preview": "vite preview",
     "start": "electron .",
-    "dist:win": "npm run build:web && electron-builder --win nsis"
+    "dist:win": "npm run build:web && electron-builder --win nsis --publish never"
   },
   "dependencies": {
     "react": "^18.3.1",
