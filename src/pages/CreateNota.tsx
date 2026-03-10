@@ -16,8 +16,9 @@ import {
 } from "../types";
 import { STEP_LABELS } from "../constants";
 import SmallField from "../components/SmallField";
-import { classNames, formatRupiah, printImageDataUrl } from "../utils";
+import { classNames, formatRupiah } from "../utils";
 import { buildReceiptImageDataUrl } from "../receiptPrint";
+import { printReceiptSnapshot } from "../printSystem";
 
 interface CreateNotaProps {
   category: CategoryKey;
@@ -238,16 +239,17 @@ export default function CreateNota({
   }, [category, activeTemplate, form, items, paperWidth]);
 
   const handlePrint = async () => {
-    const dataUrl = await buildReceiptImageDataUrl(
-      {
-        category,
-        templateId: activeTemplate,
-        form: JSON.parse(JSON.stringify(form)),
-        items: JSON.parse(JSON.stringify(items)),
-      },
-      paperWidth,
-    );
-    printImageDataUrl(dataUrl, paperWidth);
+    const snapshot = {
+      category,
+      templateId: activeTemplate,
+      form: JSON.parse(JSON.stringify(form)),
+      items: JSON.parse(JSON.stringify(items)),
+    } as PrintSnapshot;
+    try {
+      await printReceiptSnapshot(snapshot, paperWidth);
+    } catch {
+      window.alert("Gagal cetak nota. Coba ulangi dan cek printer.");
+    }
   };
 
   function renderInfoFields() {

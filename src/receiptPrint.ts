@@ -53,6 +53,53 @@ function wrapText(
   return lines;
 }
 
+function applyThermalEnhancement(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  logoAreas: Array<{ x: number; y: number; width: number; height: number }>,
+): void {
+  const imageData = ctx.getImageData(0, 0, width, height);
+  const data = imageData.data;
+  const textThreshold = 164;
+  const logoThreshold = 152;
+  const contrast = 1.12;
+
+  const isInLogoArea = (x: number, y: number): boolean =>
+    logoAreas.some(
+      (area) =>
+        x >= area.x &&
+        x < area.x + area.width &&
+        y >= area.y &&
+        y < area.y + area.height,
+    );
+
+  for (let i = 0; i < data.length; i += 4) {
+    const pixelIndex = i / 4;
+    const x = pixelIndex % width;
+    const y = Math.floor(pixelIndex / width);
+    const alpha = data[i + 3];
+    if (alpha < 16) {
+      data[i] = 255;
+      data[i + 1] = 255;
+      data[i + 2] = 255;
+      data[i + 3] = 255;
+      continue;
+    }
+
+    const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+    const contrasted = (gray - 128) * contrast + 128;
+    const threshold = isInLogoArea(x, y) ? logoThreshold : textThreshold;
+    const bw = contrasted < threshold ? 0 : 255;
+    data[i] = bw;
+    data[i + 1] = bw;
+    data[i + 2] = bw;
+    data[i + 3] = 255;
+  }
+
+  ctx.putImageData(imageData, 0, 0);
+}
+
 export async function buildReceiptImageDataUrl(
   snapshot: PrintSnapshot,
   paperWidth: PaperWidth,
@@ -137,29 +184,39 @@ export async function buildReceiptImageDataUrl(
     infoRows.push({ label: "Bayar", value: (form as BelanjaForm).metodeBayar || "-" });
   }
 
+  const renderScale = paperWidth === 58 ? 4 : 2;
+  const fontScale = 1.22;
+  const spacingScale = 1.24;
+  const fs = (value: number) => Math.round(value * fontScale);
+  const sp = (value: number) => Math.round(value * spacingScale);
   const paperPx = paperWidth === 80 ? 640 : 464;
   const padding = paperWidth === 80 ? 26 : 22;
   const innerWidth = paperPx - padding * 2;
+  const logoAreas: Array<{ x: number; y: number; width: number; height: number }> = [];
+  const estimatedHeight =
+    sp(520) +
+    infoRows.length * sp(30) +
+    items.length * sp(56) +
+    ((form.catatan ? Math.ceil(form.catatan.length / 28) : 1) * sp(26));
   const canvas = document.createElement("canvas");
-  canvas.width = paperPx;
-  canvas.height =
-    520 +
-    infoRows.length * 30 +
-    items.length * 56 +
-    ((form.catatan ? Math.ceil(form.catatan.length / 28) : 1) * 26);
+  canvas.width = paperPx * renderScale;
+  canvas.height = estimatedHeight * renderScale;
   const ctx = canvas.getContext("2d");
   if (!ctx) {
     throw new Error("Gagal menyiapkan canvas cetak");
   }
+  ctx.scale(renderScale, renderScale);
 
   ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillRect(0, 0, paperPx, estimatedHeight);
   ctx.fillStyle = "#000000";
   ctx.textBaseline = "top";
   const receiptFont =
-    "'Thermal Sans Mono', 'Courier New', 'Liberation Mono', monospace";
-  ctx.font = `19px ${receiptFont}`;
-  let y = 16;
+    "'Consolas', 'Lucida Console', 'DejaVu Sans Mono', 'Liberation Mono', monospace";
+  ctx.font = `${fs(19)}px ${receiptFont}`;
+  let y = sp(16);
+  const weightNormal = "600";
+  const weightBold = "800";
 
   const logoSrc = String((form as any).logoDataUrl || "");
   if (logoSrc) {
@@ -201,22 +258,33 @@ export async function buildReceiptImageDataUrl(
           data[i + 3] = 255;
         }
         lctx.putImageData(imageData, 0, 0);
-        ctx.drawImage(logoCanvas, (paperPx - w) / 2, y, w, h);
+        const drawX = (paperPx - w) / 2;
+        const drawY = y;
+        ctx.drawImage(logoCanvas, drawX, drawY, w, h);
+        logoAreas.push({ x: drawX, y: drawY, width: w, height: h });
       } else {
-        ctx.drawImage(logo, (paperPx - w) / 2, y, w, h);
+        const drawX = (paperPx - w) / 2;
+        const drawY = y;
+        ctx.drawImage(logo, drawX, drawY, w, h);
+        logoAreas.push({ x: drawX, y: drawY, width: w, height: h });
       }
-      y += h + 8;
+      y += h + sp(8);
     } catch {
       // ignore logo load errors
     }
   }
 
-  const centerLine = (text: string, bold = false, size = 19) => {
-    ctx.font = `${bold ? "700" : "500"} ${size}px ${receiptFont}`;
+  const centerLine = (text: string, bold = false, size = fs(19)) => {
+    ctx.font = `${bold ? weightBold : weightNormal} ${size}px ${receiptFont}`;
     const t = String(text || "-");
     const w = ctx.measureText(t).width;
-    ctx.fillText(t, (paperPx - w) / 2, y);
-    y += size >= 20 ? 34 : 28;
+    const x = (paperPx - w) / 2;
+    ctx.fillText(t, x, y);
+    if (bold) {
+      // Overdraw to force visible bold even on printers/fonts with weak weight variants.
+      ctx.fillText(t, x + 0.8, y);
+    }
+    y += size >= fs(20) ? sp(34) : sp(28);
   };
 
   const divider = (bold = false) => {
@@ -231,26 +299,26 @@ export async function buildReceiptImageDataUrl(
     ctx.stroke();
     ctx.setLineDash([]);
     ctx.lineWidth = 1;
-    y += 13;
+    y += sp(13);
   };
 
   const row = (left: string, right: string, bold = false) => {
-    ctx.font = `${bold ? "700" : "500"} 18px ${receiptFont}`;
+    ctx.font = `${bold ? weightBold : weightNormal} ${fs(18)}px ${receiptFont}`;
     const l = String(left || "-");
     const r = String(right || "-");
     ctx.fillText(l, padding, y);
     const rw = ctx.measureText(r).width;
     ctx.fillText(r, paperPx - padding - rw, y);
-    y += 30;
+    y += sp(30);
   };
 
-  centerLine(form.toko || "-", true, isTemplateB ? 20 : 22);
+  centerLine(form.toko || "-", true, isTemplateB ? fs(20) : fs(22));
   if (!isTemplateB) {
     wrapText(ctx, form.alamat || "-", innerWidth).forEach((line) => centerLine(line));
   } else if (form.alamat) {
-    centerLine(form.alamat, false, 18);
+    centerLine(form.alamat, false, fs(18));
   }
-  y += 2;
+  y += sp(2);
 
   divider();
   infoRows.forEach((info) => row(info.label, info.value));
@@ -259,19 +327,20 @@ export async function buildReceiptImageDataUrl(
   items.forEach((item) => {
     if (isTemplateB) {
       row(item.name || "-", formatRupiah(item.qty * item.price), true);
-      ctx.font = `500 16px ${receiptFont}`;
+      ctx.font = `${weightNormal} ${fs(16)}px ${receiptFont}`;
       ctx.fillStyle = "#000000";
       ctx.fillText(`${item.qty} x ${formatRupiah(item.price)}`, padding, y);
       ctx.fillStyle = "#000000";
-      y += 26;
+      y += sp(26);
       return;
     }
     const itemName = isTemplateC ? `* ${item.name || "-"}` : item.name || "-";
-    ctx.font = `700 19px ${receiptFont}`;
+    ctx.font = `${weightBold} ${fs(19)}px ${receiptFont}`;
     ctx.fillText(itemName, padding, y);
-    y += 28;
+    ctx.fillText(itemName, padding + 0.8, y);
+    y += sp(28);
     row(`${item.qty} x ${formatRupiah(item.price)}`, formatRupiah(item.qty * item.price));
-    y += isTemplateC ? 6 : 4;
+    y += isTemplateC ? sp(6) : sp(4);
   });
 
   divider(true);
@@ -284,15 +353,16 @@ export async function buildReceiptImageDataUrl(
   if (!(isMakanTemplateB || isLainTemplateB || isParkirTemplateB || isBelanjaTemplateB)) {
     wrapText(ctx, form.catatan || "-", innerWidth).forEach((line) => centerLine(line));
   }
-  y += 8;
+  y += sp(8);
 
   if (isParkirTemplateA || isParkirTemplateB) {
     const parkirForm = form as ParkirForm;
     const parkirDurationText = calcParkirDurationText(parkirForm);
+    logoAreas.length = 0;
 
-    y = 16;
+    y = sp(16);
     ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, paperPx, estimatedHeight);
     ctx.fillStyle = "#000000";
 
     if (logoSrc) {
@@ -303,14 +373,17 @@ export async function buildReceiptImageDataUrl(
         const ratio = Math.min(maxW / logo.width, maxH / logo.height, 1);
         const w = logo.width * ratio;
         const h = logo.height * ratio;
-        ctx.drawImage(logo, (paperPx - w) / 2, y, w, h);
-        y += h + 8;
+        const drawX = (paperPx - w) / 2;
+        const drawY = y;
+        ctx.drawImage(logo, drawX, drawY, w, h);
+        logoAreas.push({ x: drawX, y: drawY, width: w, height: h });
+        y += h + sp(8);
       } catch {
         // ignore logo load errors
       }
     }
 
-    centerLine(parkirForm.toko || "-", true, isTemplateB ? 17 : 18);
+    centerLine(parkirForm.toko || "-", true, isTemplateB ? fs(17) : fs(18));
     if (isParkirTemplateA && parkirForm.alamat) {
       wrapText(ctx, parkirForm.alamat, innerWidth).forEach((line) => centerLine(line));
     }
@@ -319,10 +392,10 @@ export async function buildReceiptImageDataUrl(
     if (isParkirTemplateA) {
       row("No Nota", parkirForm.nomor || "-");
       row("Tanggal", parkirForm.tanggal || "-");
-      y += 4;
+      y += sp(4);
       row("Plat", parkirForm.platNomor || "-");
       row("Jenis", parkirForm.kendaraan || "-");
-      y += 4;
+      y += sp(4);
       row("Masuk", parkirForm.jamMasuk || "-");
       row("Keluar", parkirForm.jamKeluar || "-");
       row("Durasi", parkirDurationText);
@@ -350,12 +423,13 @@ export async function buildReceiptImageDataUrl(
         ? parkirForm.catatan || "Terima kasih"
         : parkirForm.catatan || "Simpan nota ini";
     wrapText(ctx, closing, innerWidth).forEach((line) => centerLine(line));
-    y += 8;
+    y += sp(8);
   }
 
   const cropped = document.createElement("canvas");
-  cropped.width = canvas.width;
-  cropped.height = Math.max(200, Math.min(canvas.height, y + 10));
+  const cropHeight = Math.max(sp(200), Math.min(estimatedHeight, y + sp(10)));
+  cropped.width = paperPx * renderScale;
+  cropped.height = cropHeight * renderScale;
   const cctx = cropped.getContext("2d");
   if (!cctx) {
     throw new Error("Gagal menyiapkan hasil cetak");
@@ -363,6 +437,17 @@ export async function buildReceiptImageDataUrl(
   cctx.fillStyle = "#ffffff";
   cctx.fillRect(0, 0, cropped.width, cropped.height);
   cctx.drawImage(canvas, 0, 0);
+  applyThermalEnhancement(
+    cctx,
+    cropped.width,
+    cropped.height,
+    logoAreas.map((area) => ({
+      x: Math.round(area.x * renderScale),
+      y: Math.round(area.y * renderScale),
+      width: Math.round(area.width * renderScale),
+      height: Math.round(area.height * renderScale),
+    })),
+  );
 
   return cropped.toDataURL("image/png");
 }

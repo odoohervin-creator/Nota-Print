@@ -1,7 +1,8 @@
 import React from "react";
 import { HistoryRow, PaperWidth } from "../types";
-import { formatRupiah, printImageDataUrl } from "../utils";
+import { formatRupiah } from "../utils";
 import { buildReceiptImageDataUrl } from "../receiptPrint";
+import { printReceiptSnapshot } from "../printSystem";
 
 interface HistoryProps {
   rows: HistoryRow[];
@@ -134,9 +135,12 @@ export default function History({
       );
       return;
     }
-    const dataUrl = await buildReceiptImageDataUrl(row.printSnapshot, paperWidth);
-    printImageDataUrl(dataUrl, paperWidth);
-    onMarkPrinted(row.id);
+    try {
+      await printReceiptSnapshot(row.printSnapshot, paperWidth);
+      onMarkPrinted(row.id);
+    } catch {
+      window.alert("Gagal cetak nota. Coba ulangi dan cek printer.");
+    }
   };
 
   return (

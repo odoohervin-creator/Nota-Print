@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell } = require('electron');
+const { app, BrowserWindow, shell, ipcMain } = require('electron');
 const path = require('path');
 
 function createWindow() {
@@ -40,6 +40,77 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  ipcMain.handle('print-receipt-native', async (_event, payload) => {
+    const paperWidth = payload?.paperWidth === 80 ? 80 : 58;
+    const pageWidthMm = paperWidth;
+    const contentWidthMm = pageWidthMm;
+
+    const imageDataUrl = String(payload?.imageDataUrl || '').trim();
+    if (!imageDataUrl) {
+      return { ok: false, error: 'EMPTY_IMAGE_PAYLOAD' };
+    }
+
+    const html = `<!doctype html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <style>
+            * { box-sizing: border-box; }
+            @page { size: ${pageWidthMm}mm auto; margin: 0; }
+            html, body { margin: 0; padding: 0; background: #fff; }
+            body {
+              width: ${pageWidthMm}mm;
+              display: flex;
+              justify-content: center;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+            img {
+              width: ${contentWidthMm}mm;
+              margin: 0;
+              display: block;
+              image-rendering: auto;
+            }
+          </style>
+        </head>
+        <body><img src="${imageDataUrl}" alt="Nota" /></body>
+      </html>`;
+
+    const win = new BrowserWindow({
+      show: false,
+      webPreferences: {
+        sandbox: true,
+      },
+    });
+
+    try {
+      await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+      await new Promise((resolve, reject) => {
+        win.webContents.print(
+          {
+            silent: false,
+            printBackground: false,
+            margins: { marginType: 'none' },
+          },
+          (success, failureReason) => {
+            if (!success) {
+              reject(new Error(failureReason || 'PRINT_FAILED'));
+              return;
+            }
+            resolve(undefined);
+          },
+        );
+      });
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: error?.message || 'PRINT_FAILED' };
+    } finally {
+      if (!win.isDestroyed()) {
+        win.close();
+      }
+    }
+  });
+
   createWindow();
 
   app.on('activate', () => {
