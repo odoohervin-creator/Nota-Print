@@ -138,8 +138,10 @@ export default function History({
     try {
       await printReceiptSnapshot(row.printSnapshot, paperWidth);
       onMarkPrinted(row.id);
-    } catch {
-      window.alert("Gagal cetak nota. Coba ulangi dan cek printer.");
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "UNKNOWN_PRINT_ERROR";
+      window.alert(`Gagal cetak nota: ${message}`);
     }
   };
 

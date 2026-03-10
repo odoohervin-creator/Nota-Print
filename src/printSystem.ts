@@ -7,6 +7,7 @@ type NativePrintResult = {
 };
 
 type NativePrinterBridge = {
+  platform?: string;
   printReceiptNative?: (payload: {
     paperWidth: PaperWidth;
     imageDataUrl?: string;
@@ -21,8 +22,10 @@ type NativeAttemptResult = {
 
 function printInPopupWindow(dataUrl: string, paperWidth: PaperWidth): Promise<void> {
   return new Promise((resolve, reject) => {
+    const desktop = (window as unknown as { desktop?: NativePrinterBridge }).desktop;
+    const isWindows = desktop?.platform === "win32";
     const pageWidthMm = paperWidth;
-    const contentWidthMm = pageWidthMm;
+    const contentWidthMm = isWindows ? pageWidthMm - 2 : pageWidthMm;
     const html = `<!doctype html>
       <html>
         <head>
@@ -33,11 +36,15 @@ function printInPopupWindow(dataUrl: string, paperWidth: PaperWidth): Promise<vo
             @page { size: ${pageWidthMm}mm auto; margin: 0; }
             html, body { margin: 0; padding: 0; background: #fff; }
             body {
+              margin: 0 auto;
+              width: ${pageWidthMm}mm;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+            .sheet {
               width: ${pageWidthMm}mm;
               display: flex;
               justify-content: center;
-              -webkit-print-color-adjust: exact;
-              print-color-adjust: exact;
             }
             img {
               width: ${contentWidthMm}mm;
@@ -48,7 +55,9 @@ function printInPopupWindow(dataUrl: string, paperWidth: PaperWidth): Promise<vo
           </style>
         </head>
         <body>
-          <img id="receipt" src="${dataUrl}" alt="Nota" />
+          <div class="sheet">
+            <img id="receipt" src="${dataUrl}" alt="Nota" />
+          </div>
           <script>
             const done = () => {
               setTimeout(() => window.close(), 200);

@@ -247,8 +247,10 @@ export default function CreateNota({
     } as PrintSnapshot;
     try {
       await printReceiptSnapshot(snapshot, paperWidth);
-    } catch {
-      window.alert("Gagal cetak nota. Coba ulangi dan cek printer.");
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "UNKNOWN_PRINT_ERROR";
+      window.alert(`Gagal cetak nota: ${message}`);
     }
   };
 

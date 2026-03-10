@@ -43,7 +43,8 @@ app.whenReady().then(() => {
   ipcMain.handle('print-receipt-native', async (_event, payload) => {
     const paperWidth = payload?.paperWidth === 80 ? 80 : 58;
     const pageWidthMm = paperWidth;
-    const contentWidthMm = pageWidthMm;
+    const isWindows = process.platform === 'win32';
+    const contentWidthMm = isWindows ? pageWidthMm - 2 : pageWidthMm;
 
     const imageDataUrl = String(payload?.imageDataUrl || '').trim();
     if (!imageDataUrl) {
@@ -59,11 +60,15 @@ app.whenReady().then(() => {
             @page { size: ${pageWidthMm}mm auto; margin: 0; }
             html, body { margin: 0; padding: 0; background: #fff; }
             body {
+              margin: 0 auto;
+              width: ${pageWidthMm}mm;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+            .sheet {
               width: ${pageWidthMm}mm;
               display: flex;
               justify-content: center;
-              -webkit-print-color-adjust: exact;
-              print-color-adjust: exact;
             }
             img {
               width: ${contentWidthMm}mm;
@@ -73,11 +78,19 @@ app.whenReady().then(() => {
             }
           </style>
         </head>
-        <body><img src="${imageDataUrl}" alt="Nota" /></body>
+        <body>
+          <div class="sheet">
+            <img src="${imageDataUrl}" alt="Nota" />
+          </div>
+        </body>
       </html>`;
 
     const win = new BrowserWindow({
-      show: false,
+      show: true,
+      width: 420,
+      height: 720,
+      autoHideMenuBar: true,
+      skipTaskbar: true,
       webPreferences: {
         sandbox: true,
       },
