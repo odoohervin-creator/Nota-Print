@@ -137,16 +137,16 @@ export async function buildReceiptImageDataUrl(
     infoRows.push({ label: "Bayar", value: (form as BelanjaForm).metodeBayar || "-" });
   }
 
-  const paperPx = paperWidth === 80 ? 576 : 420;
-  const padding = 20;
+  const paperPx = paperWidth === 80 ? 640 : 464;
+  const padding = paperWidth === 80 ? 26 : 22;
   const innerWidth = paperPx - padding * 2;
   const canvas = document.createElement("canvas");
   canvas.width = paperPx;
   canvas.height =
-    360 +
-    infoRows.length * 24 +
-    items.length * 40 +
-    ((form.catatan ? Math.ceil(form.catatan.length / 32) : 1) * 20);
+    520 +
+    infoRows.length * 30 +
+    items.length * 56 +
+    ((form.catatan ? Math.ceil(form.catatan.length / 28) : 1) * 26);
   const ctx = canvas.getContext("2d");
   if (!ctx) {
     throw new Error("Gagal menyiapkan canvas cetak");
@@ -156,7 +156,9 @@ export async function buildReceiptImageDataUrl(
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.fillStyle = "#000000";
   ctx.textBaseline = "top";
-  ctx.font = "16px 'Courier New', monospace";
+  const receiptFont =
+    "'Thermal Sans Mono', 'Courier New', 'Liberation Mono', monospace";
+  ctx.font = `19px ${receiptFont}`;
   let y = 16;
 
   const logoSrc = String((form as any).logoDataUrl || "");
@@ -209,12 +211,12 @@ export async function buildReceiptImageDataUrl(
     }
   }
 
-  const centerLine = (text: string, bold = false, size = 16) => {
-    ctx.font = `${bold ? "700" : "400"} ${size}px 'Courier New', monospace`;
+  const centerLine = (text: string, bold = false, size = 19) => {
+    ctx.font = `${bold ? "700" : "500"} ${size}px ${receiptFont}`;
     const t = String(text || "-");
     const w = ctx.measureText(t).width;
     ctx.fillText(t, (paperPx - w) / 2, y);
-    y += size >= 18 ? 26 : 22;
+    y += size >= 20 ? 34 : 28;
   };
 
   const divider = (bold = false) => {
@@ -229,24 +231,24 @@ export async function buildReceiptImageDataUrl(
     ctx.stroke();
     ctx.setLineDash([]);
     ctx.lineWidth = 1;
-    y += 10;
+    y += 13;
   };
 
   const row = (left: string, right: string, bold = false) => {
-    ctx.font = `${bold ? "700" : "400"} 15px 'Courier New', monospace`;
+    ctx.font = `${bold ? "700" : "500"} 18px ${receiptFont}`;
     const l = String(left || "-");
     const r = String(right || "-");
     ctx.fillText(l, padding, y);
     const rw = ctx.measureText(r).width;
     ctx.fillText(r, paperPx - padding - rw, y);
-    y += 22;
+    y += 30;
   };
 
-  centerLine(form.toko || "-", true, isTemplateB ? 17 : 18);
+  centerLine(form.toko || "-", true, isTemplateB ? 20 : 22);
   if (!isTemplateB) {
     wrapText(ctx, form.alamat || "-", innerWidth).forEach((line) => centerLine(line));
   } else if (form.alamat) {
-    centerLine(form.alamat, false, 14);
+    centerLine(form.alamat, false, 18);
   }
   y += 2;
 
@@ -257,19 +259,19 @@ export async function buildReceiptImageDataUrl(
   items.forEach((item) => {
     if (isTemplateB) {
       row(item.name || "-", formatRupiah(item.qty * item.price), true);
-      ctx.font = "400 13px 'Courier New', monospace";
-      ctx.fillStyle = "#333333";
+      ctx.font = `500 16px ${receiptFont}`;
+      ctx.fillStyle = "#000000";
       ctx.fillText(`${item.qty} x ${formatRupiah(item.price)}`, padding, y);
       ctx.fillStyle = "#000000";
-      y += 18;
+      y += 26;
       return;
     }
     const itemName = isTemplateC ? `* ${item.name || "-"}` : item.name || "-";
-    ctx.font = "700 15px 'Courier New', monospace";
+    ctx.font = `700 19px ${receiptFont}`;
     ctx.fillText(itemName, padding, y);
-    y += 20;
+    y += 28;
     row(`${item.qty} x ${formatRupiah(item.price)}`, formatRupiah(item.qty * item.price));
-    y += isTemplateC ? 4 : 2;
+    y += isTemplateC ? 6 : 4;
   });
 
   divider(true);

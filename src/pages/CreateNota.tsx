@@ -176,7 +176,8 @@ export default function CreateNota({
   );
   const extra = Number((form as any).biayaTambahan || 0);
   const total = subtotal + extra;
-  const previewWidthPx = paperWidth === 80 ? 300 : 220;
+  const previewContentWidthMm = paperWidth === 80 ? 70 : 48;
+  const previewPrintWidthPx = paperWidth === 80 ? 332 : 228;
   const parkirDurationText = React.useMemo(() => {
     if (category !== "parkir") return "-";
     const f = form as ParkirForm;
@@ -730,7 +731,7 @@ export default function CreateNota({
     return (
       <div
         className="mx-auto rounded-[28px] border border-slate-300 bg-white p-4 shadow-md"
-        style={{ width: `${previewWidthPx}px` }}
+        style={{ width: `${previewPrintWidthPx}px` }}
       >
         {showLogo && (
           <div className="mb-2 flex justify-center">
@@ -1329,7 +1330,9 @@ export default function CreateNota({
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-semibold">Live Preview</h3>
-                <p className="text-sm text-slate-600">Thermal {paperWidth}mm</p>
+                <p className="text-sm text-slate-600">
+                  Thermal {paperWidth}mm · Konten {previewContentWidthMm}mm
+                </p>
               </div>
               <div className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
                 Aktif
@@ -1351,7 +1354,8 @@ export default function CreateNota({
                   <img
                     src={livePreviewUrl}
                     alt="Live preview nota"
-                    className="mx-auto w-full max-w-[320px] rounded-xl border border-slate-200 bg-white"
+                    className="mx-auto rounded-xl border border-slate-200 bg-white"
+                    style={{ width: `${previewPrintWidthPx}px`, maxWidth: "100%" }}
                   />
                 </div>
               )}

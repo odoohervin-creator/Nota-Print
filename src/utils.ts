@@ -9,6 +9,7 @@ export function classNames(
 }
 
 export function printImageDataUrl(dataUrl: string, paperWidthMm: 58 | 80): void {
+  const contentWidthMm = paperWidthMm === 58 ? 48 : 70;
   const frame = document.createElement("iframe");
   frame.style.position = "fixed";
   frame.style.right = "0";
@@ -32,12 +33,18 @@ export function printImageDataUrl(dataUrl: string, paperWidthMm: 58 | 80): void 
             margin: 0;
             padding: 0;
             background: #fff;
+            width: ${paperWidthMm}mm;
             display: flex;
             justify-content: center;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
           }
           img {
-            width: ${paperWidthMm}mm;
+            width: ${contentWidthMm}mm;
             display: block;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+            margin-top: 1mm;
           }
         </style>
       </head>
